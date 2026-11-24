@@ -49,7 +49,7 @@ func main() {
 		log.Fatalf("rede: %v", err)
 	}
 
-	if err := ConstroiImagens(cfg, "."); err != nil {
+	if err := ConstroiImagens(cfg, cfg.RepoRoot); err != nil {
 		log.Fatalf("build: %v", err)
 	}
 

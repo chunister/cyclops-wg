@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -13,6 +14,7 @@ type Config struct {
 	WGAddress      string
 	ServersDir     string
 	StateFile      string
+	RepoRoot       string
 	NetworkName    string
 	GatewayImage   string
 	BalancerImage  string
@@ -26,13 +28,15 @@ type Config struct {
 }
 
 func carregaConfig() Config {
+	raiz := env("REPO_ROOT", "..")
 	return Config{
 		GatewayCount:   envInt("GATEWAY_COUNT", 10),
 		SpareCount:     envInt("SPARE_COUNT", 3),
 		WGPrivateKey:   env("WG_PRIVATE_KEY", ""),
 		WGAddress:      env("WG_ADDRESS", "10.14.0.2/16"),
-		ServersDir:     env("SERVERS_DIR", "./servers"),
+		ServersDir:     env("SERVERS_DIR", filepath.Join(raiz, "servers")),
 		StateFile:      env("STATE_FILE", "./controller-state.json"),
+		RepoRoot:       raiz,
 		NetworkName:    env("DOCKER_NETWORK", "cyclops-net"),
 		GatewayImage:   env("GATEWAY_IMAGE", "cyclops-gateway:dev"),
 		BalancerImage:  env("BALANCER_IMAGE", "cyclops-balancer:dev"),

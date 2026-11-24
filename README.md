@@ -48,8 +48,7 @@ Exige `GATEWAY_COUNT + SPARE_COUNT` servidores diferentes em `servers/` (10 + 3 
 ```bash
 cd controller
 go build -o controller .
-source ../.env && export $(cut -d= -f1 ../.env)
-export SERVERS_DIR=../servers
+set -a && source ../.env && set +a
 sudo -E ./controller
 ```
 
