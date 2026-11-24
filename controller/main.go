@@ -249,6 +249,10 @@ func (c *Controlador) serveStatus() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(c.slots)
 	})
-	go http.ListenAndServe(":"+c.cfg.ControllerPort, mux)
+	go func() {
+		if err := http.ListenAndServe(":"+c.cfg.ControllerPort, mux); err != nil {
+			log.Printf("status do controlador: %v", err)
+		}
+	}()
 	log.Printf("status do controlador em :%s/status", c.cfg.ControllerPort)
 }
