@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 )
 
@@ -21,6 +22,27 @@ func serveStatus(pool *Pool, endereco string) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(lista)
+	})
+	// Só o controlador chama isso, para trocar quem está ativo sem reiniciar o balanceador.
+	mux.HandleFunc("/gateways", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		corpo, err := io.ReadAll(io.LimitReader(r.Body, 1<<16))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var pedido struct {
+			Enderecos []string `json:"enderecos"`
+		}
+		if err := json.Unmarshal(corpo, &pedido); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		pool.DefineGateways(pedido.Enderecos)
+		w.WriteHeader(http.StatusNoContent)
 	})
 	go http.ListenAndServe(endereco, mux)
 }

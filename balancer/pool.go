@@ -76,3 +76,27 @@ func (p *Pool) Todos() []*Gateway {
 	copy(copia, p.gateways)
 	return copia
 }
+
+// DefineGateways troca a lista de gateways ativos. Um endereço que já
+// existia mantém seu estado de saúde; um endereço novo entra como saudável.
+// Usado pelo controlador para promover uma reserva sem reiniciar o balanceador.
+func (p *Pool) DefineGateways(enderecos []string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	existentes := make(map[string]*Gateway, len(p.gateways))
+	for _, g := range p.gateways {
+		existentes[g.Addr] = g
+	}
+
+	var novaLista []*Gateway
+	for _, end := range enderecos {
+		if g, ok := existentes[end]; ok {
+			novaLista = append(novaLista, g)
+		} else {
+			novaLista = append(novaLista, &Gateway{Addr: end, healthy: true})
+		}
+	}
+	p.gateways = novaLista
+	p.proximo = 0
+}
