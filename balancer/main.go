@@ -14,7 +14,7 @@ import (
 func main() {
 	enderecos := dividePorVirgula(env("GATEWAYS", ""))
 	if len(enderecos) == 0 {
-		log.Fatal("defina GATEWAYS com os endereços host:porta dos gateways, separados por vírgula")
+		log.Print("GATEWAYS vazio no arranque, esperando um PUT /gateways")
 	}
 
 	pool := NovoPool(enderecos)
