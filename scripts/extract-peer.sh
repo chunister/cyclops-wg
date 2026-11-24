@@ -30,10 +30,15 @@ for arquivo in "${ORIGEM}"/*.conf; do
     nome=$(basename "${arquivo}" .conf)
     saida="${DESTINO}/${nome}.conf"
 
-    peer=$(awk -F' *= *' '
+    # Separa no primeiro "=" só: as chaves em base64 terminam em "=" e precisam dele
+    peer=$(awk '
         /^\[Peer\]/ { dentro = 1; next }
         /^\[/       { dentro = 0 }
-        dentro && /^(PublicKey|AllowedIPs|Endpoint|PersistentKeepalive)/ { print $1 " = " $2 }
+        dentro && /^(PublicKey|AllowedIPs|Endpoint|PersistentKeepalive)/ {
+            campo = $1
+            sub(/^[^=]*= */, "")
+            print campo " = " $0
+        }
     ' "${arquivo}")
 
     # Sem chave pública ou endpoint não há o que guardar
