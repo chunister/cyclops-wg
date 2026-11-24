@@ -23,8 +23,9 @@ Em construção. Ainda não há código funcional.
 
 ## Stack
 
-- Linguagem: Go. O balanceador e a API de controle viram um binário estático.
-- Gateway: Debian slim com `wireguard-tools` e `microsocks`.
+- Linguagem: Go. O balanceador compila em um binário estático.
+- Gateway: Debian 13 slim com `wireguard-tools` e `microsocks`.
+- Balanceador: servidor SOCKS5 próprio (sem autenticação, só o comando CONNECT). Recebe conexões de qualquer cliente SOCKS5, como o Burp ou o curl, e escolhe um gateway saudável por conexão, em round-robin. Testa cada gateway a cada `HEALTH_INTERVAL` segundos e tira da rotação o que falhar `HEALTH_FAILS` vezes seguidas. Expõe `GET /status` com o estado de cada gateway.
 
 ## Configuração
 
