@@ -1,0 +1,18 @@
+services:
+  gateway1:
+    build: ./gateway
+    image: cyclops-gateway:dev
+    environment:
+      WG_PRIVATE_KEY: ${WG_PRIVATE_KEY}
+      WG_ADDRESS: ${WG_ADDRESS:-10.14.0.2/16}
+      SERVER: ${GATEWAY1_SERVER}
+    volumes:
+      - ./servers:/servers:ro
+    cap_add:
+      - NET_ADMIN
+    dns:
+      - 162.252.172.57
+      - 149.154.159.92
+    ports:
+      - "${SOCKS_PORT:-1080}:1080"
+    restart: unless-stopped
