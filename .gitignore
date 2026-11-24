@@ -1,0 +1,17 @@
+# Segredos locais: nunca versionar
+.env
+*.env.local
+
+# Configurações WireGuard geradas (contêm chave privada)
+wireguard/*.conf
+*.conf.local
+
+# Build e artefatos
+bin/
+dist/
+*.exe
+
+# Editores e SO
+.DS_Store
+.idea/
+.vscode/
