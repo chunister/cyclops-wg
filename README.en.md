@@ -49,6 +49,7 @@ Needs `GATEWAY_COUNT + SPARE_COUNT` distinct servers in `servers/` (10 + 3 by de
 cd controller
 go build -o controller .
 source ../.env && export $(cut -d= -f1 ../.env)
+export SERVERS_DIR=../servers
 sudo -E ./controller
 ```
 
