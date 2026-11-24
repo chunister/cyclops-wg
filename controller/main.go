@@ -21,6 +21,7 @@ type Slot struct {
 	IP       string
 	Papel    string
 	Falhas   int
+	EmReparo bool `json:"-"`
 }
 
 type Controlador struct {
@@ -172,6 +173,34 @@ func (c *Controlador) cicloDeReconciliacao(ctx context.Context) {
 	}
 
 	c.promoveSeNecessario(ctx)
+	c.curaReservasDoentes(ctx)
+}
+
+// curaReservasDoentes pega qualquer reserva que acumulou HEALTH_FAILS falhas
+// (por exemplo, um gateway que já foi demovido e caiu de novo) e manda
+// reiniciar e trocar de servidor em segundo plano, do mesmo jeito que uma
+// demoção recente. Sem isso, uma reserva que falhar fora do momento da
+// promoção ficava largada para sempre, nunca mais tentando se recuperar.
+func (c *Controlador) curaReservasDoentes(ctx context.Context) {
+	c.mu.Lock()
+	var doentes []*Slot
+	for _, s := range c.slots {
+		if s.Papel == papelReserva && s.Falhas >= c.cfg.HealthFails && !s.EmReparo {
+			s.EmReparo = true
+			s.Falhas = 0
+			doentes = append(doentes, s)
+		}
+	}
+	c.mu.Unlock()
+
+	for _, s := range doentes {
+		go func(s *Slot) {
+			c.reequilibraServidor(ctx, s)
+			c.mu.Lock()
+			s.EmReparo = false
+			c.mu.Unlock()
+		}(s)
+	}
 }
 
 func (c *Controlador) promoveSeNecessario(ctx context.Context) {
@@ -182,7 +211,7 @@ func (c *Controlador) promoveSeNecessario(ctx context.Context) {
 		if s.Papel == papelAtivo && s.Falhas >= c.cfg.HealthFails && doente == nil {
 			doente = s
 		}
-		if s.Papel == papelReserva && s.Falhas == 0 && reservaBoa == nil {
+		if s.Papel == papelReserva && s.Falhas == 0 && !s.EmReparo && reservaBoa == nil {
 			reservaBoa = s
 		}
 	}
@@ -203,13 +232,19 @@ func (c *Controlador) promoveSeNecessario(ctx context.Context) {
 	doente.Papel = papelReserva
 	reservaBoa.Papel = papelAtivo
 	doente.Falhas = 0
+	doente.EmReparo = true
 	c.mu.Unlock()
 
 	if err := c.publicaAtivos(); err != nil {
 		log.Printf("atualizar balanceador: %v", err)
 	}
 
-	go c.reequilibraServidor(ctx, doente)
+	go func() {
+		c.reequilibraServidor(ctx, doente)
+		c.mu.Lock()
+		doente.EmReparo = false
+		c.mu.Unlock()
+	}()
 }
 
 // reequilibraServidor troca o servidor do slot que acabou de virar reserva,
