@@ -35,6 +35,16 @@ Under construction. There is no working code yet.
 
 Full documentation on generating keys and `.conf` files will come once the gateway is ready.
 
+## Known limitations
+
+The balancer only implements the SOCKS5 `CONNECT` command, which is TCP. The browser's WebRTC uses STUN over UDP to discover the public IP, and that traffic doesn't go through the tunnel: it leaves directly over the internet, revealing the real user IP even with the proxy configured.
+
+Tested on [ipleak.net](https://ipleak.net): the HTTP exit IP and DNS both showed the correct WireGuard server, with no leak. The WebRTC test showed the real ISP IP.
+
+Mitigation available today: disable WebRTC in the browser you use with cyclops-wg. Chromium has no native toggle for this; it works with an extension that blocks WebRTC, or by switching to a browser that allows disabling it through a setting, such as Firefox (`about:config`, `media.peerconnection.enabled = false`).
+
+For a future round: the balancer could gain `UDP ASSOCIATE` support, or the host could block outbound UDP outside the tunnel with a firewall rule, to drop WebRTC instead of letting it leak.
+
 ## Host requirements
 
 - Kernel with the WireGuard module loaded (`sudo modprobe wireguard`).
