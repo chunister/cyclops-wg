@@ -1,4 +1,22 @@
 services:
+  balancer:
+    build: ./balancer
+    image: cyclops-balancer:dev
+    environment:
+      # gateway1:1090 é a porta interna fixa do microsocks de cada gateway,
+      # não a SOCKS_PORT publicada abaixo (essa é só a entrada do balanceador).
+      GATEWAYS: ${GATEWAYS:-gateway1:1090}
+      SOCKS_PORT: 1080
+      API_PORT: 8081
+      HEALTH_INTERVAL: ${HEALTH_INTERVAL:-15}
+      HEALTH_FAILS: ${HEALTH_FAILS:-3}
+    ports:
+      - "${SOCKS_PORT:-1080}:1080"
+      - "${API_PORT:-8081}:8081"
+    depends_on:
+      - gateway1
+    restart: unless-stopped
+
   gateway1:
     build: ./gateway
     image: cyclops-gateway:dev
@@ -6,6 +24,7 @@ services:
       WG_PRIVATE_KEY: ${WG_PRIVATE_KEY}
       WG_ADDRESS: ${WG_ADDRESS:-10.14.0.2/16}
       SERVER: ${GATEWAY1_SERVER}
+      SOCKS_PORT: 1090
     volumes:
       - ./servers:/servers:ro
     cap_add:
@@ -13,6 +32,4 @@ services:
     dns:
       - 162.252.172.57
       - 149.154.159.92
-    ports:
-      - "${SOCKS_PORT:-1080}:1080"
     restart: unless-stopped
