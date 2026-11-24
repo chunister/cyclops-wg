@@ -146,6 +146,16 @@ func (d *Docker) IPNaRede(ctx context.Context, nome string) (string, error) {
 	return rede.IPAddress, nil
 }
 
+// EstaRodando diz se o container está de pé, para saber se dá para rodar
+// switch-server nele ou se é preciso reiniciá-lo primeiro.
+func (d *Docker) EstaRodando(ctx context.Context, nome string) (bool, error) {
+	info, err := d.cli.ContainerInspect(ctx, nome)
+	if err != nil {
+		return false, err
+	}
+	return info.State != nil && info.State.Running, nil
+}
+
 // TrocaServidor executa o switch-server dentro do container, sem reiniciá-lo.
 func (d *Docker) TrocaServidor(ctx context.Context, nome, servidor string, timeout time.Duration) error {
 	execCtx, cancel := context.WithTimeout(ctx, timeout)

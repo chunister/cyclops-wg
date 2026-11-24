@@ -230,8 +230,33 @@ func (c *Controlador) reequilibraServidor(ctx context.Context, s *Slot) {
 		return
 	}
 
-	if err := c.docker.TrocaServidor(ctx, s.Nome, novoServidor, 30*time.Second); err != nil {
-		log.Printf("switch-server em %s falhou: %v", s.Nome, err)
+	rodando, err := c.docker.EstaRodando(ctx, s.Nome)
+	if err != nil {
+		log.Printf("não consegui checar se %s está rodando: %v", s.Nome, err)
+		return
+	}
+	if !rodando {
+		log.Printf("%s não está rodando (provavelmente caiu); reiniciando antes de trocar o servidor", s.Nome)
+		if err := c.docker.ReiniciaGateway(ctx, s.Nome); err != nil {
+			log.Printf("reinício de %s falhou: %v", s.Nome, err)
+			return
+		}
+		if !esperaContainerRodando(ctx, c.docker, s.Nome, 30*time.Second) {
+			log.Printf("%s não voltou a rodar a tempo", s.Nome)
+			return
+		}
+	}
+
+	var trocaErr error
+	for tentativa := 1; tentativa <= 5; tentativa++ {
+		trocaErr = c.docker.TrocaServidor(ctx, s.Nome, novoServidor, 30*time.Second)
+		if trocaErr == nil {
+			break
+		}
+		time.Sleep(3 * time.Second)
+	}
+	if trocaErr != nil {
+		log.Printf("switch-server em %s falhou: %v", s.Nome, trocaErr)
 		return
 	}
 
