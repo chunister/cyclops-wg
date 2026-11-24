@@ -109,6 +109,10 @@ func (d *Docker) CriaBalanceador(ctx context.Context) error {
 			fmt.Sprintf("HEALTH_INTERVAL=%d", d.cfg.HealthInterval),
 			fmt.Sprintf("HEALTH_FAILS=%d", d.cfg.HealthFails),
 		},
+		ExposedPorts: nat.PortSet{
+			"1080/tcp": struct{}{},
+			"8081/tcp": struct{}{},
+		},
 	}
 	hostCfg := &container.HostConfig{
 		PortBindings: nat.PortMap{
