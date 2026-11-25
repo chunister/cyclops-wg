@@ -32,6 +32,7 @@ type Dashboard struct {
 	cpuHistorico   []float64
 
 	aoRenovar func()
+	pausado   bool
 }
 
 func NovoDashboard() *Dashboard {
@@ -46,7 +47,7 @@ func NovoDashboard() *Dashboard {
 	}
 	d.eventos.SetChangedFunc(func() { d.eventos.ScrollToEnd() })
 
-	d.resumo.SetBorder(true).SetTitle(" cyclops-wg — atalhos: q sai · r renova todos os túneis ")
+	d.resumo.SetBorder(true).SetTitle(" cyclops-wg — atalhos: q sai · r renova todos os túneis · p pausa/retoma · c limpa eventos ")
 	d.recursos.SetBorder(true).SetTitle(" recursos (host) ")
 	d.tabelaAtivos.SetBorder(true).SetTitle(" ativos ")
 	d.tabelaReservas.SetBorder(true).SetTitle(" reservas ")
@@ -74,6 +75,12 @@ func NovoDashboard() *Dashboard {
 			if d.aoRenovar != nil {
 				d.aoRenovar()
 			}
+			return nil
+		case evento.Rune() == 'p':
+			d.pausado = !d.pausado
+			return nil
+		case evento.Rune() == 'c':
+			d.eventos.Clear()
 			return nil
 		}
 		return evento
@@ -123,11 +130,18 @@ func (d *Dashboard) Atualiza(inicio time.Time, slots []*Slot) {
 		sort.Slice(reservas, func(i, j int) bool { return reservas[i].Nome < reservas[j].Nome })
 
 		uptime := time.Since(inicio).Round(time.Second)
+		pausa := ""
+		if d.pausado {
+			pausa = "    [yellow]PAUSADO (aperte p pra retomar)[white]"
+		}
 		d.resumo.SetText(fmt.Sprintf(
-			"ativos saudáveis: [green]%d[white]/%d    reservas saudáveis: [green]%d[white]/%d    no ar há %s",
-			ativosOk, len(ativos), reservaOk, len(reservas), uptime,
+			"ativos saudáveis: [green]%d[white]/%d    reservas saudáveis: [green]%d[white]/%d    no ar há %s%s",
+			ativosOk, len(ativos), reservaOk, len(reservas), uptime, pausa,
 		))
 
+		if d.pausado {
+			return
+		}
 		preencheTabelaGateways(d.tabelaAtivos, ativos)
 		preencheTabelaGateways(d.tabelaReservas, reservas)
 	})
@@ -180,6 +194,9 @@ func preencheTabelaGateways(tabela *tview.Table, slots []*Slot) {
 // antes dos dois-pontos da porta) pro IP público do túnel WireGuard dele.
 func (d *Dashboard) AtualizaConexoes(conexoes []Conexao, ipSaida map[string]string) {
 	d.app.QueueUpdateDraw(func() {
+		if d.pausado {
+			return
+		}
 		d.conexoes.Clear()
 		cabecalho := []string{"HORA", "ORIGEM", "DESTINO", "GATEWAY", "IP SAÍDA"}
 		for col, titulo := range cabecalho {
@@ -232,6 +249,9 @@ func (d *Dashboard) AtualizaRecursos() {
 	ramPct, ramUsado, ramTotal, errRAM := usoRAM()
 
 	d.app.QueueUpdateDraw(func() {
+		if d.pausado {
+			return
+		}
 		linhaCPU := fmt.Sprintf("CPU  %3.0f%%  (%s)   %s", cpuPct, barraBlocos(cpuPct, 20), sparkline(d.cpuHistorico))
 		if errCPU != nil {
 			linhaCPU = fmt.Sprintf("CPU  --%%  (sem leitura: %v)", errCPU)
