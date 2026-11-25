@@ -33,8 +33,9 @@ type Controlador struct {
 	cooldown *Cooldown
 	catalogo []string
 
-	mu    sync.Mutex
-	slots []*Slot
+	mu           sync.Mutex
+	slots        []*Slot
+	rotacionando bool
 }
 
 func main() {
@@ -79,6 +80,16 @@ func main() {
 
 	ctrl.serveStatus()
 
+	if cfg.FullRotateInterval > 0 {
+		go func() {
+			ticker := time.NewTicker(time.Duration(cfg.FullRotateInterval) * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				ctrl.rotacionaTodos(ctx)
+			}
+		}()
+	}
+
 	if !cfg.Dashboard {
 		ticker := time.NewTicker(time.Duration(cfg.HealthInterval) * time.Second)
 		defer ticker.Stop()
@@ -91,6 +102,7 @@ func main() {
 	inicio := time.Now()
 	dash := NovoDashboard()
 	log.SetOutput(dash)
+	dash.DefinirAoRenovar(func() { go ctrl.rotacionaTodos(ctx) })
 
 	go func() {
 		ticker := time.NewTicker(time.Duration(cfg.HealthInterval) * time.Second)
@@ -374,6 +386,39 @@ func (c *Controlador) reequilibraServidor(ctx context.Context, s *Slot) {
 	} else {
 		log.Printf("não consegui descobrir o novo IP de saída de %s: %v", s.Nome, err)
 	}
+}
+
+// rotacionaTodos troca o servidor de todos os slots de uma vez, não só dos
+// que falharam, pra variar o conjunto de IPs de saída mesmo sem queda.
+// Marca todos como EmReparo durante a troca pra promoveSeNecessario não
+// tentar promover ninguém no meio da operação, e ignora um novo pedido
+// se uma rotação já estiver em andamento.
+func (c *Controlador) rotacionaTodos(ctx context.Context) {
+	c.mu.Lock()
+	if c.rotacionando {
+		c.mu.Unlock()
+		log.Printf("rotação completa já em andamento, ignorando novo pedido")
+		return
+	}
+	c.rotacionando = true
+	slots := append([]*Slot{}, c.slots...)
+	for _, s := range slots {
+		s.EmReparo = true
+	}
+	c.mu.Unlock()
+
+	log.Printf("rotação completa: trocando o servidor dos %d gateways", len(slots))
+	for _, s := range slots {
+		c.reequilibraServidor(ctx, s)
+	}
+	log.Printf("rotação completa concluída")
+
+	c.mu.Lock()
+	for _, s := range slots {
+		s.EmReparo = false
+	}
+	c.rotacionando = false
+	c.mu.Unlock()
 }
 
 func (c *Controlador) serveStatus() {

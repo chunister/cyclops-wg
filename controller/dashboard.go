@@ -30,6 +30,8 @@ type Dashboard struct {
 	cpuAnterior    cpuAmostra
 	cpuTemAnterior bool
 	cpuHistorico   []float64
+
+	aoRenovar func()
 }
 
 func NovoDashboard() *Dashboard {
@@ -44,12 +46,12 @@ func NovoDashboard() *Dashboard {
 	}
 	d.eventos.SetChangedFunc(func() { d.eventos.ScrollToEnd() })
 
-	d.resumo.SetBorder(true).SetTitle(" cyclops-wg ")
+	d.resumo.SetBorder(true).SetTitle(" cyclops-wg — atalhos: q sai · r renova todos os túneis ")
 	d.recursos.SetBorder(true).SetTitle(" recursos (host) ")
 	d.tabelaAtivos.SetBorder(true).SetTitle(" ativos ")
 	d.tabelaReservas.SetBorder(true).SetTitle(" reservas ")
 	d.conexoes.SetBorder(true).SetTitle(" conexões recentes ")
-	d.eventos.SetBorder(true).SetTitle(" eventos (q ou ctrl-c pra sair) ")
+	d.eventos.SetBorder(true).SetTitle(" eventos ")
 
 	tabelasGateways := tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(d.tabelaAtivos, 0, 1, false).
@@ -64,14 +66,27 @@ func NovoDashboard() *Dashboard {
 
 	d.app.SetRoot(layout, true)
 	d.app.SetInputCapture(func(evento *tcell.EventKey) *tcell.EventKey {
-		if evento.Rune() == 'q' || evento.Key() == tcell.KeyCtrlC {
+		switch {
+		case evento.Rune() == 'q' || evento.Key() == tcell.KeyCtrlC:
 			d.app.Stop()
+			return nil
+		case evento.Rune() == 'r':
+			if d.aoRenovar != nil {
+				d.aoRenovar()
+			}
 			return nil
 		}
 		return evento
 	})
 
 	return d
+}
+
+// DefinirAoRenovar registra a função chamada quando o usuário aperta "r".
+// Quem chama é responsável por rodar em segundo plano (a rotação demora),
+// pra não travar a tela enquanto ela acontece.
+func (d *Dashboard) DefinirAoRenovar(f func()) {
+	d.aoRenovar = f
 }
 
 // Write faz o Dashboard servir de saída para o log padrão: cada linha
