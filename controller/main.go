@@ -118,7 +118,6 @@ func main() {
 		}
 	}()
 
-	dash.Atualiza(inicio, ctrl.CopiaSlots())
 	if err := dash.Executa(); err != nil {
 		fmt.Printf("dashboard: %v\n", err)
 		os.Exit(1)
