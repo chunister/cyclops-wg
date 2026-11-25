@@ -28,6 +28,7 @@ type Config struct {
 	ControllerPort     string
 	Dashboard          bool
 	FullRotateInterval int // segundos; 0 desliga a rotação periódica completa
+	Lang               string
 }
 
 func carregaConfig() Config {
@@ -52,6 +53,7 @@ func carregaConfig() Config {
 		ControllerPort:     env("CONTROLLER_PORT", "9090"),
 		Dashboard:          envBool("DASHBOARD", true),
 		FullRotateInterval: envInt("FULL_ROTATE_INTERVAL", 0),
+		Lang:               env("DASH_LANG", "en"),
 	}
 }
 
@@ -69,7 +71,7 @@ func envInt(chave string, padrao int) int {
 	}
 	n, err := strconv.Atoi(v)
 	if err != nil {
-		log.Printf("valor inválido em %s=%q, usando %d", chave, v, padrao)
+		log.Print(T("log_invalid_env_int", chave, v, padrao))
 		return padrao
 	}
 	return n
@@ -86,7 +88,7 @@ func envBool(chave string, padrao bool) bool {
 	case "1", "true", "sim":
 		return true
 	default:
-		log.Printf("valor inválido em %s=%q, usando %v", chave, v, padrao)
+		log.Print(T("log_invalid_env_bool", chave, v, padrao))
 		return padrao
 	}
 }

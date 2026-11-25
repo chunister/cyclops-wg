@@ -50,18 +50,13 @@ func NovoDashboard() *Dashboard {
 	d.eventos.SetChangedFunc(func() { d.eventos.ScrollToEnd() })
 
 	d.resumo.SetBorder(true).SetTitle(" cyclops-wg ")
-	d.recursos.SetBorder(true).SetTitle(" recursos (host) ")
-	d.tabelaAtivos.SetBorder(true).SetTitle(" ativos ")
-	d.tabelaReservas.SetBorder(true).SetTitle(" reservas ")
-	d.conexoes.SetBorder(true).SetTitle(" conexões recentes ")
-	d.eventos.SetBorder(true).SetTitle(" eventos ")
-	d.atalhos.SetBorder(true).SetTitle(" atalhos ")
-	d.atalhos.SetText(
-		"[yellow]q[white]  sair\n" +
-			"[yellow]r[white]  renovar todos os túneis\n" +
-			"[yellow]p[white]  pausar/retomar a tela\n" +
-			"[yellow]c[white]  limpar eventos",
-	)
+	d.recursos.SetBorder(true)
+	d.tabelaAtivos.SetBorder(true)
+	d.tabelaReservas.SetBorder(true)
+	d.conexoes.SetBorder(true)
+	d.eventos.SetBorder(true)
+	d.atalhos.SetBorder(true)
+	d.aplicaIdioma()
 
 	tabelasGateways := tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(d.tabelaAtivos, 0, 1, false).
@@ -95,11 +90,30 @@ func NovoDashboard() *Dashboard {
 		case evento.Rune() == 'c':
 			d.eventos.Clear()
 			return nil
+		case evento.Rune() == 'l':
+			ProximoIdioma()
+			d.aplicaIdioma()
+			return nil
 		}
 		return evento
 	})
 
 	return d
+}
+
+// aplicaIdioma redesenha os títulos e textos estáticos dos painéis no
+// idioma ativo. Chamada na montagem do dashboard e de novo toda vez que o
+// atalho "l" troca o idioma, já que esses textos não são redesenhados
+// pelos tickers normais (ao contrário dos cabeçalhos de tabela, que são
+// recalculados em toda atualização).
+func (d *Dashboard) aplicaIdioma() {
+	d.recursos.SetTitle(T("panel_resources"))
+	d.tabelaAtivos.SetTitle(T("panel_active"))
+	d.tabelaReservas.SetTitle(T("panel_spare"))
+	d.conexoes.SetTitle(T("panel_connections"))
+	d.eventos.SetTitle(T("panel_events"))
+	d.atalhos.SetTitle(T("panel_shortcuts"))
+	d.atalhos.SetText(T("shortcuts_text"))
 }
 
 // DefinirAoRenovar registra a função chamada quando o usuário aperta "r".
@@ -145,12 +159,9 @@ func (d *Dashboard) Atualiza(inicio time.Time, slots []*Slot) {
 		uptime := time.Since(inicio).Round(time.Second)
 		pausa := ""
 		if d.pausado {
-			pausa = "    [yellow]PAUSADO (aperte p pra retomar)[white]"
+			pausa = T("paused_suffix")
 		}
-		d.resumo.SetText(fmt.Sprintf(
-			"ativos saudáveis: [green]%d[white]/%d    reservas saudáveis: [green]%d[white]/%d    no ar há %s%s",
-			ativosOk, len(ativos), reservaOk, len(reservas), uptime, pausa,
-		))
+		d.resumo.SetText(T("summary_line", ativosOk, len(ativos), reservaOk, len(reservas), uptime, pausa))
 
 		if d.pausado {
 			return
@@ -165,7 +176,10 @@ func (d *Dashboard) Atualiza(inicio time.Time, slots []*Slot) {
 // de qual das duas tabelas é essa.
 func preencheTabelaGateways(tabela *tview.Table, slots []*Slot) {
 	tabela.Clear()
-	cabecalho := []string{"GATEWAY", "SERVIDOR", "IP INTERNO", "IP SAÍDA", "ÚLT. TROCA", "FALHAS", "ESTADO"}
+	cabecalho := []string{
+		T("col_gateway"), T("col_server"), T("col_internal_ip"), T("col_exit_ip"),
+		T("col_last_switch"), T("col_failures"), T("col_state"),
+	}
 	for col, titulo := range cabecalho {
 		tabela.SetCell(0, col, tview.NewTableCell(titulo).
 			SetTextColor(tcell.ColorYellow).
@@ -173,12 +187,12 @@ func preencheTabelaGateways(tabela *tview.Table, slots []*Slot) {
 	}
 
 	for i, s := range slots {
-		estado, cor := "saudável", tcell.ColorGreen
+		estado, cor := T("state_healthy"), tcell.ColorGreen
 		switch {
 		case s.EmReparo:
-			estado, cor = "reparando", tcell.ColorYellow
+			estado, cor = T("state_repairing"), tcell.ColorYellow
 		case s.Falhas > 0:
-			estado, cor = "falhando", tcell.ColorRed
+			estado, cor = T("state_failing"), tcell.ColorRed
 		}
 		linha := i + 1
 		tabela.SetCell(linha, 0, tview.NewTableCell(s.Nome))
@@ -193,7 +207,7 @@ func preencheTabelaGateways(tabela *tview.Table, slots []*Slot) {
 
 		troca := "-"
 		if !s.UltimaTroca.IsZero() {
-			troca = "há " + time.Since(s.UltimaTroca).Round(time.Second).String()
+			troca = T("time_ago", time.Since(s.UltimaTroca).Round(time.Second).String())
 		}
 		tabela.SetCell(linha, 4, tview.NewTableCell(troca).SetTextColor(tcell.ColorGray))
 
@@ -211,7 +225,7 @@ func (d *Dashboard) AtualizaConexoes(conexoes []Conexao, ipSaida map[string]stri
 			return
 		}
 		d.conexoes.Clear()
-		cabecalho := []string{"HORA", "ORIGEM", "DESTINO", "GATEWAY", "IP SAÍDA"}
+		cabecalho := []string{T("col_time"), T("col_source"), T("col_destination"), T("col_gateway"), T("col_exit_ip")}
 		for col, titulo := range cabecalho {
 			d.conexoes.SetCell(0, col, tview.NewTableCell(titulo).
 				SetTextColor(tcell.ColorYellow).
@@ -267,11 +281,11 @@ func (d *Dashboard) AtualizaRecursos() {
 		}
 		linhaCPU := fmt.Sprintf("CPU  %3.0f%%  (%s)   %s", cpuPct, barraBlocos(cpuPct, 20), sparkline(d.cpuHistorico))
 		if errCPU != nil {
-			linhaCPU = fmt.Sprintf("CPU  --%%  (sem leitura: %v)", errCPU)
+			linhaCPU = fmt.Sprintf("CPU  --%%  %s", T("no_reading", errCPU))
 		}
 		linhaRAM := fmt.Sprintf("RAM  %3.0f%%  (%s)   %.1f/%.1f GB", ramPct, barraBlocos(ramPct, 20), ramUsado, ramTotal)
 		if errRAM != nil {
-			linhaRAM = fmt.Sprintf("RAM  --%%  (sem leitura: %v)", errRAM)
+			linhaRAM = fmt.Sprintf("RAM  --%%  %s", T("no_reading", errRAM))
 		}
 		d.recursos.SetText(linhaCPU + "\n" + linhaRAM)
 	})

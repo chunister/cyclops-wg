@@ -40,31 +40,32 @@ type Controlador struct {
 
 func main() {
 	cfg := carregaConfig()
+	DefineIdioma(idiomaDeString(cfg.Lang))
 	if cfg.WGPrivateKey == "" {
-		log.Fatal("defina WG_PRIVATE_KEY no ambiente")
+		log.Fatal(T("err_wg_key_required"))
 	}
 
 	docker, err := NovoDocker(cfg)
 	if err != nil {
-		log.Fatalf("docker: %v", err)
+		log.Fatal(T("err_docker", err))
 	}
 
 	ctx := context.Background()
 	if err := docker.GaranteRede(ctx); err != nil {
-		log.Fatalf("rede: %v", err)
+		log.Fatal(T("err_network", err))
 	}
 
 	if err := ConstroiImagens(cfg, cfg.RepoRoot); err != nil {
-		log.Fatalf("build: %v", err)
+		log.Fatal(T("err_build", err))
 	}
 
 	catalogo, err := Catalogo(cfg.ServersDir)
 	if err != nil {
-		log.Fatalf("catálogo de servidores: %v", err)
+		log.Fatal(T("err_catalog", err))
 	}
 	total := cfg.GatewayCount + cfg.SpareCount
 	if len(catalogo) < total {
-		log.Fatalf("catálogo tem %d servidores, preciso de %d (GATEWAY_COUNT + SPARE_COUNT)", len(catalogo), total)
+		log.Fatal(T("err_catalog_too_small", len(catalogo), total))
 	}
 
 	ctrl := &Controlador{
@@ -75,7 +76,7 @@ func main() {
 	}
 
 	if err := ctrl.sobeTudo(ctx); err != nil {
-		log.Fatalf("subida inicial: %v", err)
+		log.Fatal(T("err_initial_boot", err))
 	}
 
 	ctrl.serveStatus()
@@ -175,7 +176,7 @@ func (c *Controlador) sobeTudo(ctx context.Context) error {
 		usados[servidor] = true
 
 		nome := fmt.Sprintf("cyclops-gw-%d", i)
-		log.Printf("subindo %s com %s", nome, servidor)
+		log.Print(T("log_bringing_up_gateway", nome, servidor))
 		if err := c.docker.CriaGateway(ctx, nome, servidor); err != nil {
 			return fmt.Errorf("criar %s: %w", nome, err)
 		}
@@ -191,19 +192,19 @@ func (c *Controlador) sobeTudo(ctx context.Context) error {
 		return fmt.Errorf("criar balanceador: %w", err)
 	}
 
-	log.Printf("esperando os túneis subirem...")
+	log.Print(T("log_waiting_tunnels"))
 	time.Sleep(10 * time.Second)
 	for _, s := range c.slots {
 		ip, err := c.docker.IPNaRede(ctx, s.Nome)
 		if err != nil {
-			log.Printf("sem IP ainda para %s: %v", s.Nome, err)
+			log.Print(T("log_no_ip_yet", s.Nome, err))
 			continue
 		}
 		s.IP = ip
 		if saida, err := buscaIPSaida(ip+":1090", 8*time.Second); err == nil {
 			s.IPSaida = saida
 		} else {
-			log.Printf("não consegui descobrir o IP de saída de %s: %v", s.Nome, err)
+			log.Print(T("log_exit_ip_lookup_failed", s.Nome, err))
 		}
 	}
 
@@ -243,7 +244,7 @@ func (c *Controlador) cicloDeReconciliacao(ctx context.Context) {
 		c.mu.Lock()
 		if err != nil {
 			s.Falhas++
-			log.Printf("%s (%s) falhou a verificação (%d): %v", s.Nome, s.Papel, s.Falhas, err)
+			log.Print(T("log_health_check_failed", s.Nome, s.Papel, s.Falhas, err))
 		} else {
 			s.Falhas = 0
 		}
@@ -299,14 +300,14 @@ func (c *Controlador) promoveSeNecessario(ctx context.Context) {
 	}
 	if reservaBoa == nil {
 		c.mu.Unlock()
-		log.Printf("%s doente, mas sem reserva saudável; reiniciando o container", doente.Nome)
+		log.Print(T("log_sick_no_spare", doente.Nome))
 		if err := c.docker.ReiniciaGateway(ctx, doente.Nome); err != nil {
-			log.Printf("reinício de %s falhou: %v", doente.Nome, err)
+			log.Print(T("log_restart_failed", doente.Nome, err))
 		}
 		return
 	}
 
-	log.Printf("promovendo %s no lugar de %s", reservaBoa.Nome, doente.Nome)
+	log.Print(T("log_promoting", reservaBoa.Nome, doente.Nome))
 	doente.Papel = papelReserva
 	reservaBoa.Papel = papelAtivo
 	doente.Falhas = 0
@@ -314,7 +315,7 @@ func (c *Controlador) promoveSeNecessario(ctx context.Context) {
 	c.mu.Unlock()
 
 	if err := c.publicaAtivos(); err != nil {
-		log.Printf("atualizar balanceador: %v", err)
+		log.Print(T("log_balancer_update_failed", err))
 	}
 
 	go func() {
@@ -339,23 +340,23 @@ func (c *Controlador) reequilibraServidor(ctx context.Context, s *Slot) {
 
 	novoServidor, err := Escolhe(c.catalogo, usados, c.cooldown, time.Duration(c.cfg.ServerCooldown)*time.Second)
 	if err != nil {
-		log.Printf("sem servidor livre para %s agora: %v", s.Nome, err)
+		log.Print(T("log_no_free_server", s.Nome, err))
 		return
 	}
 
 	rodando, err := c.docker.EstaRodando(ctx, s.Nome)
 	if err != nil {
-		log.Printf("não consegui checar se %s está rodando: %v", s.Nome, err)
+		log.Print(T("log_running_check_failed", s.Nome, err))
 		return
 	}
 	if !rodando {
-		log.Printf("%s não está rodando (provavelmente caiu); reiniciando antes de trocar o servidor", s.Nome)
+		log.Print(T("log_not_running_restarting", s.Nome))
 		if err := c.docker.ReiniciaGateway(ctx, s.Nome); err != nil {
-			log.Printf("reinício de %s falhou: %v", s.Nome, err)
+			log.Print(T("log_restart_failed", s.Nome, err))
 			return
 		}
 		if !esperaContainerRodando(ctx, c.docker, s.Nome, 30*time.Second) {
-			log.Printf("%s não voltou a rodar a tempo", s.Nome)
+			log.Print(T("log_not_running_in_time", s.Nome))
 			return
 		}
 	}
@@ -369,7 +370,7 @@ func (c *Controlador) reequilibraServidor(ctx context.Context, s *Slot) {
 		time.Sleep(3 * time.Second)
 	}
 	if trocaErr != nil {
-		log.Printf("switch-server em %s falhou: %v", s.Nome, trocaErr)
+		log.Print(T("log_switch_server_failed", s.Nome, trocaErr))
 		return
 	}
 
@@ -377,14 +378,14 @@ func (c *Controlador) reequilibraServidor(ctx context.Context, s *Slot) {
 	s.Servidor = novoServidor
 	s.UltimaTroca = time.Now()
 	c.mu.Unlock()
-	log.Printf("%s agora aponta para %s", s.Nome, novoServidor)
+	log.Print(T("log_now_points_to", s.Nome, novoServidor))
 
 	if saida, err := buscaIPSaida(s.IP+":1090", 8*time.Second); err == nil {
 		c.mu.Lock()
 		s.IPSaida = saida
 		c.mu.Unlock()
 	} else {
-		log.Printf("não consegui descobrir o novo IP de saída de %s: %v", s.Nome, err)
+		log.Print(T("log_new_exit_ip_lookup_failed", s.Nome, err))
 	}
 }
 
@@ -397,7 +398,7 @@ func (c *Controlador) rotacionaTodos(ctx context.Context) {
 	c.mu.Lock()
 	if c.rotacionando {
 		c.mu.Unlock()
-		log.Printf("rotação completa já em andamento, ignorando novo pedido")
+		log.Print(T("log_rotation_already_running"))
 		return
 	}
 	c.rotacionando = true
@@ -407,11 +408,11 @@ func (c *Controlador) rotacionaTodos(ctx context.Context) {
 	}
 	c.mu.Unlock()
 
-	log.Printf("rotação completa: trocando o servidor dos %d gateways", len(slots))
+	log.Print(T("log_rotation_start", len(slots)))
 	for _, s := range slots {
 		c.reequilibraServidor(ctx, s)
 	}
-	log.Printf("rotação completa concluída")
+	log.Print(T("log_rotation_done"))
 
 	c.mu.Lock()
 	for _, s := range slots {
@@ -431,8 +432,8 @@ func (c *Controlador) serveStatus() {
 	})
 	go func() {
 		if err := http.ListenAndServe(":"+c.cfg.ControllerPort, mux); err != nil {
-			log.Printf("status do controlador: %v", err)
+			log.Print(T("log_status_server_error", err))
 		}
 	}()
-	log.Printf("status do controlador em :%s/status", c.cfg.ControllerPort)
+	log.Print(T("log_status_server_listening", c.cfg.ControllerPort))
 }
