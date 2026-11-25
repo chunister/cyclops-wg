@@ -11,9 +11,10 @@ type statusGateway struct {
 	Healthy bool   `json:"healthy"`
 }
 
-// serveStatus expõe GET /status com o estado de cada gateway. Serve para
-// acompanhar a rotação de fora, sem precisar ler o log.
-func serveStatus(pool *Pool, endereco string) {
+// serveStatus expõe GET /status com o estado de cada gateway, e GET
+// /conexoes com as últimas conexões vistas. Serve para acompanhar a
+// rotação de fora, sem precisar ler o log.
+func serveStatus(pool *Pool, historico *HistoricoConexoes, endereco string) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		var lista []statusGateway
@@ -22,6 +23,10 @@ func serveStatus(pool *Pool, endereco string) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(lista)
+	})
+	mux.HandleFunc("/conexoes", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(historico.Recentes())
 	})
 	// Só o controlador chama isso, para trocar quem está ativo sem reiniciar o balanceador.
 	mux.HandleFunc("/gateways", func(w http.ResponseWriter, r *http.Request) {

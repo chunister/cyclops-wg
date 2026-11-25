@@ -23,7 +23,7 @@ const (
 	tipoIPv6       = 0x04
 )
 
-func atendeCliente(conexao net.Conn, pool *Pool, timeoutConexao time.Duration) {
+func atendeCliente(conexao net.Conn, pool *Pool, timeoutConexao time.Duration, historico *HistoricoConexoes) {
 	defer conexao.Close()
 	conexao.SetDeadline(time.Now().Add(30 * time.Second))
 
@@ -56,6 +56,10 @@ func atendeCliente(conexao net.Conn, pool *Pool, timeoutConexao time.Duration) {
 
 	if err := responde(conexao, 0x00); err != nil {
 		return
+	}
+
+	if historico != nil {
+		historico.Registra(conexao.RemoteAddr().String(), destino, gw.Addr)
 	}
 
 	conexao.SetDeadline(time.Time{})

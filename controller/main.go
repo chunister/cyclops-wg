@@ -106,6 +106,18 @@ func main() {
 		}
 	}()
 
+	go func() {
+		redesenha := time.NewTicker(2 * time.Second)
+		defer redesenha.Stop()
+		for range redesenha.C {
+			conexoes, err := ConexoesRecentes(cfg.BalancerAddr)
+			if err != nil {
+				continue
+			}
+			dash.AtualizaConexoes(conexoes)
+		}
+	}()
+
 	dash.Atualiza(inicio, ctrl.CopiaSlots())
 	if err := dash.Executa(); err != nil {
 		fmt.Printf("dashboard: %v\n", err)

@@ -54,7 +54,7 @@ sudo -E ./controller
 
 El controlador necesita privilegio para hablar con Docker (o que tu usuario esté en el grupo `docker`), y gestiona los contenedores directamente, sin `docker-compose.yml`.
 
-Por defecto, la terminal donde corre el controlador se convierte en un dashboard en vivo: un resumen arriba (cuántos activos y reservas están sanos, cuánto tiempo lleva corriendo), una tabla con cada gateway (papel, servidor, IP, fallos seguidos, estado), y un panel de eventos abajo con el mismo log que antes iba directo a la terminal. Presiona `q` o `Ctrl-C` para salir; los contenedores siguen corriendo después de que el controlador se cierra. Para correr sin esta pantalla (por ejemplo detrás de `nohup` o un servicio systemd, sin terminal interactiva), define `DASHBOARD=0` en el `.env` y sigue con `curl -s http://127.0.0.1:9090/status` en su lugar.
+Por defecto, la terminal donde corre el controlador se convierte en un dashboard en vivo: un resumen arriba (cuántos activos y reservas están sanos, cuánto tiempo lleva corriendo), una tabla con cada gateway (papel, servidor, IP, fallos seguidos, estado), una tabla con las últimas conexiones vistas por el balanceador (hora, origen del cliente, destino y qué gateway la atendió, hasta `CONN_HISTORY` filas), y un panel de eventos abajo con el mismo log que antes iba directo a la terminal. Presiona `q` o `Ctrl-C` para salir; los contenedores siguen corriendo después de que el controlador se cierra. Para correr sin esta pantalla (por ejemplo detrás de `nohup` o un servicio systemd, sin terminal interactiva), define `DASHBOARD=0` en el `.env` y sigue con `curl -s http://127.0.0.1:9090/status` en su lugar.
 
 ## Limitaciones conocidas
 
