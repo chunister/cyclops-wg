@@ -32,8 +32,18 @@ apt-get update
 echo "instalando dependências básicas..."
 apt-get install -y --no-install-recommends curl ca-certificates gnupg
 
-echo "instalando Docker, Compose v2 e Go..."
-apt-get install -y --no-install-recommends docker.io docker-compose-v2 golang-go
+echo "instalando Docker e Go..."
+apt-get install -y --no-install-recommends docker.io golang-go
+
+# O pacote do Compose v2 muda de nome conforme a distro: Kali e Ubuntu usam
+# "docker-compose-v2", o Debian trixie usa só "docker-compose" (mesmo nome
+# do v1 antigo, mas já é o binário em Go da v2).
+echo "instalando o Compose v2..."
+if apt-cache show docker-compose-v2 >/dev/null 2>&1; then
+    apt-get install -y --no-install-recommends docker-compose-v2
+else
+    apt-get install -y --no-install-recommends docker-compose
+fi
 
 echo "carregando o módulo WireGuard..."
 modprobe wireguard
