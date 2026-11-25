@@ -12,7 +12,7 @@ A ideia veio do projeto [tatu-rotate](https://github.com/marciosouza20/tatu-rota
 
 ## Status
 
-Testado de ponta a ponta num Kali: túnel WireGuard real, balanceador SOCKS5 funcionando com curl e com o Burp, e troca de servidor sem derrubar o container. O controlador que sobe o conjunto completo (gateways ativos e reserva) ainda não foi testado com Docker de verdade.
+Testado de ponta a ponta num Kali: túnel WireGuard real, balanceador SOCKS5 funcionando com curl e com o Burp, troca de servidor sem derrubar o container, e o controlador subindo o conjunto completo (10 gateways ativos mais 3 reserva) contra um Docker de verdade. A promoção automática também foi testada derrubando um gateway ativo de propósito: uma reserva assumiu o lugar dele, e o gateway derrubado foi reiniciado e apontado para outro servidor em segundo plano.
 
 ## Peças
 
@@ -62,13 +62,13 @@ Testado em [ipleak.net](https://ipleak.net): o IP de saída HTTP e o DNS mostrar
 
 Mitigação disponível hoje: desative o WebRTC no navegador que for usar com o cyclops-wg. No Chromium não existe um botão nativo para isso; funciona com uma extensão que bloqueia WebRTC, ou trocando para um navegador que permita desativar por configuração, como o Firefox (`about:config`, `media.peerconnection.enabled = false`).
 
-Para uma próxima rodada: o balanceador pode ganhar suporte a `UDP ASSOCIATE`, ou o host pode bloquear UDP de saída fora do túnel por regra de firewall, para derrubar o WebRTC em vez de deixá-lo vazar. O controlador também ainda não foi testado com containers de verdade, só com testes de unidade e integração contra o balanceador real.
+Para uma próxima rodada: o balanceador pode ganhar suporte a `UDP ASSOCIATE`, ou o host pode bloquear UDP de saída fora do túnel por regra de firewall, para derrubar o WebRTC em vez de deixá-lo vazar.
 
 ## Requisitos no host
 
 - Kernel com o módulo WireGuard carregado (`sudo modprobe wireguard`).
-- Docker com Compose v2 (para o teste rápido) e acesso ao socket do Docker (para o controlador).
-- Go, só para compilar o controlador. O `go.mod` pede uma versão recente (puxada pelo SDK do Docker); com `GOTOOLCHAIN=auto` (padrão do Go 1.21+), o próprio `go build` baixa o toolchain certo se o instalado for mais antigo.
+- Docker Engine 27 ou mais recente, com Compose v2 (para o teste rápido) e acesso ao socket do Docker (para o controlador). Testado com Docker 27.5.1 no Kali.
+- Go, só para compilar o controlador. O `go.mod` pede Go 1.26 (puxado pelo SDK do Docker); com `GOTOOLCHAIN=auto` (padrão do Go 1.21+), o próprio `go build` baixa o toolchain certo se o instalado for mais antigo.
 
 ## Licença
 

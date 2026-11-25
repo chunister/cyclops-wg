@@ -12,7 +12,7 @@ The idea comes from [tatu-rotate](https://github.com/marciosouza20/tatu-rotate),
 
 ## Status
 
-Tested end to end on a Kali box: a real WireGuard tunnel, the SOCKS5 balancer working with curl and with Burp, and server switching without stopping the container. The controller that brings up the full set (active and spare gateways) hasn't been tested against a real Docker daemon yet.
+Tested end to end on a Kali box: a real WireGuard tunnel, the SOCKS5 balancer working with curl and with Burp, server switching without stopping the container, and the controller bringing up the full set (10 active gateways plus 3 spares) against a real Docker daemon. Automatic promotion was also tested by killing an active gateway on purpose: a spare took its place, and the killed gateway was restarted and pointed at a different server in the background.
 
 ## Pieces
 
@@ -62,13 +62,13 @@ Tested on [ipleak.net](https://ipleak.net): the HTTP exit IP and DNS both showed
 
 Mitigation available today: disable WebRTC in the browser you use with cyclops-wg. Chromium has no native toggle for this; it works with an extension that blocks WebRTC, or by switching to a browser that allows disabling it through a setting, such as Firefox (`about:config`, `media.peerconnection.enabled = false`).
 
-For a future round: the balancer could gain `UDP ASSOCIATE` support, or the host could block outbound UDP outside the tunnel with a firewall rule, to drop WebRTC instead of letting it leak. The controller also hasn't been tested against real containers yet, only unit and integration tests against the real balancer.
+For a future round: the balancer could gain `UDP ASSOCIATE` support, or the host could block outbound UDP outside the tunnel with a firewall rule, to drop WebRTC instead of letting it leak.
 
 ## Host requirements
 
 - Kernel with the WireGuard module loaded (`sudo modprobe wireguard`).
-- Docker with Compose v2 (for the quick test) and access to the Docker socket (for the controller).
-- Go, just to build the controller. The `go.mod` asks for a recent version (pulled in by the Docker SDK); with `GOTOOLCHAIN=auto` (the Go 1.21+ default), `go build` itself downloads the right toolchain if the installed one is older.
+- Docker Engine 27 or newer, with Compose v2 (for the quick test) and access to the Docker socket (for the controller). Tested with Docker 27.5.1 on Kali.
+- Go, just to build the controller. The `go.mod` asks for Go 1.26 (pulled in by the Docker SDK); with `GOTOOLCHAIN=auto` (the Go 1.21+ default), `go build` itself downloads the right toolchain if the installed one is older.
 
 ## License
 
