@@ -66,8 +66,11 @@ func (c *Cooldown) EmEspera(servidor string, duracao time.Duration) bool {
 }
 
 // Escolhe sorteia um servidor do catálogo que não esteja em uso agora (em
-// usados) nem em cooldown, e marca como usado antes de devolver.
-func Escolhe(catalogo []string, usados map[string]bool, cd *Cooldown, espera time.Duration) (string, error) {
+// usados) nem em cooldown, e marca como usado antes de devolver. Se lat não
+// for nil e topN > 0, o sorteio fica restrito aos topN candidatos com a
+// menor média de ping (LATENCY_TOP_SERVERS); caso contrário, sorteia entre
+// todos os candidatos livres, como antes dessa funcionalidade existir.
+func Escolhe(catalogo []string, usados map[string]bool, cd *Cooldown, espera time.Duration, lat *LatenciaCatalogo, topN int) (string, error) {
 	candidatos := make([]string, 0, len(catalogo))
 	for _, s := range catalogo {
 		if usados[s] {
@@ -80,6 +83,9 @@ func Escolhe(catalogo []string, usados map[string]bool, cd *Cooldown, espera tim
 	}
 	if len(candidatos) == 0 {
 		return "", fmt.Errorf("nenhum servidor livre: todos em uso ou em cooldown")
+	}
+	if lat != nil && topN > 0 {
+		candidatos = lat.TopN(candidatos, topN)
 	}
 	escolhido := candidatos[rand.Intn(len(candidatos))]
 	cd.Marca(escolhido)

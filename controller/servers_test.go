@@ -26,7 +26,7 @@ func TestEscolheServidoresDoRepoReal(t *testing.T) {
 	usados := map[string]bool{}
 	var escolhidos []string
 	for i := 0; i < 13; i++ {
-		s, err := Escolhe(catalogo, usados, cd, 600*time.Second)
+		s, err := Escolhe(catalogo, usados, cd, 600*time.Second, nil, 0)
 		if err != nil {
 			t.Fatalf("escolhe #%d: %v", i, err)
 		}
@@ -61,7 +61,7 @@ func TestEscolheFalhaSemServidorLivre(t *testing.T) {
 	cd := AbreCooldown(tmp.Name())
 
 	usados := map[string]bool{"a": true, "b": true}
-	if _, err := Escolhe(catalogo, usados, cd, time.Second); err == nil {
+	if _, err := Escolhe(catalogo, usados, cd, time.Second, nil, 0); err == nil {
 		t.Fatal("deveria falhar: nenhum servidor livre")
 	}
 }

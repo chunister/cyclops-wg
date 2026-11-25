@@ -33,6 +33,7 @@ type Controlador struct {
 	cfg      Config
 	docker   *Docker
 	cooldown *Cooldown
+	latencia *LatenciaCatalogo // nil se LATENCY_TOP_SERVERS=0 (filtro desligado)
 	catalogo []string
 
 	mu           sync.Mutex
@@ -70,11 +71,29 @@ func main() {
 		log.Fatal(T("err_catalog_too_small", len(catalogo), total))
 	}
 
+	var latencia *LatenciaCatalogo
+	if cfg.LatencyTopServers > 0 {
+		latencia = AbreLatencia(cfg.LatencyFile)
+		log.Print(T("log_latency_initial_scan", len(catalogo)))
+		latencia.RepingaCatalogo(cfg.ServersDir, catalogo)
+	}
+
 	ctrl := &Controlador{
 		cfg:      cfg,
 		docker:   docker,
 		cooldown: AbreCooldown(cfg.StateFile),
+		latencia: latencia,
 		catalogo: catalogo,
+	}
+
+	if cfg.LatencyTopServers > 0 {
+		go func() {
+			ticker := time.NewTicker(time.Duration(cfg.LatencyCheckInterval) * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				ctrl.latencia.RepingaCatalogo(cfg.ServersDir, ctrl.catalogo)
+			}
+		}()
 	}
 
 	if err := ctrl.sobeTudo(ctx); err != nil {
@@ -200,7 +219,7 @@ func (c *Controlador) sobeTudo(ctx context.Context) error {
 	}
 
 	for i := 1; i <= total; i++ {
-		servidor, err := Escolhe(c.catalogo, usados, c.cooldown, time.Duration(c.cfg.ServerCooldown)*time.Second)
+		servidor, err := Escolhe(c.catalogo, usados, c.cooldown, time.Duration(c.cfg.ServerCooldown)*time.Second, c.latencia, c.cfg.LatencyTopServers)
 		if err != nil {
 			return err
 		}
@@ -370,7 +389,7 @@ func (c *Controlador) reequilibraServidor(ctx context.Context, s *Slot) {
 	}
 	c.mu.Unlock()
 
-	novoServidor, err := Escolhe(c.catalogo, usados, c.cooldown, time.Duration(c.cfg.ServerCooldown)*time.Second)
+	novoServidor, err := Escolhe(c.catalogo, usados, c.cooldown, time.Duration(c.cfg.ServerCooldown)*time.Second, c.latencia, c.cfg.LatencyTopServers)
 	if err != nil {
 		log.Print(T("log_no_free_server", s.Nome, err))
 		return
