@@ -35,6 +35,14 @@ apt-get install -y --no-install-recommends curl ca-certificates gnupg
 echo "instalando Docker e Go..."
 apt-get install -y --no-install-recommends docker.io golang-go
 
+# No Debian trixie o docker.io virou só o daemon: o cliente /usr/bin/docker
+# saiu num pacote separado, docker-cli. Kali e Ubuntu ainda trazem os dois
+# juntos no docker.io, então o docker-cli nem existe lá.
+if apt-cache show docker-cli >/dev/null 2>&1; then
+    echo "instalando o cliente docker (docker-cli)..."
+    apt-get install -y --no-install-recommends docker-cli
+fi
+
 # O pacote do Compose v2 muda de nome conforme a distro: Kali e Ubuntu usam
 # "docker-compose-v2", o Debian trixie usa só "docker-compose" (mesmo nome
 # do v1 antigo, mas já é o binário em Go da v2).
