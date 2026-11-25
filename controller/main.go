@@ -139,15 +139,16 @@ func main() {
 		redesenha := time.NewTicker(2 * time.Second)
 		defer redesenha.Stop()
 		for range redesenha.C {
-			conexoes, err := ConexoesRecentes(cfg.BalancerAddr)
-			if err != nil {
-				continue
+			if conexoes, err := ConexoesRecentes(cfg.BalancerAddr); err == nil {
+				ipSaida := map[string]string{}
+				for _, s := range ctrl.CopiaSlots() {
+					ipSaida[s.IP] = s.IPSaida
+				}
+				dash.AtualizaConexoes(conexoes, ipSaida)
 			}
-			ipSaida := map[string]string{}
-			for _, s := range ctrl.CopiaSlots() {
-				ipSaida[s.IP] = s.IPSaida
+			if upload, download, err := Throughput(cfg.BalancerAddr); err == nil {
+				dash.AtualizaThroughput(upload, download)
 			}
-			dash.AtualizaConexoes(conexoes, ipSaida)
 		}
 	}()
 

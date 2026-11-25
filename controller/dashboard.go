@@ -11,11 +11,6 @@ import (
 	"github.com/rivo/tview"
 )
 
-// quantasAmostrasDeCPU é quanto histórico de uso de CPU o sparkline guarda.
-// Em amostras de 1s (o intervalo do ticker que chama AtualizaRecursos), são
-// os últimos 60s de uso.
-const quantasAmostrasDeCPU = 60
-
 // Dashboard mostra o estado do controlador no terminal, ao vivo, no lugar
 // do log cru. É montado só quando DASHBOARD está ligado.
 type Dashboard struct {
@@ -30,7 +25,14 @@ type Dashboard struct {
 
 	cpuAnterior    cpuAmostra
 	cpuTemAnterior bool
-	cpuHistorico   []float64
+
+	linhaCPU string
+	linhaRAM string
+	linhaNet string
+
+	bytesUpAnterior, bytesDownAnterior int64
+	temAmostraDeRede                   bool
+	amostraDeRedeQuando                time.Time
 
 	aoRenovar func()
 	pausado   bool
@@ -68,7 +70,7 @@ func NovoDashboard() *Dashboard {
 
 	layout := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(d.resumo, 3, 0, false).
-		AddItem(d.recursos, 4, 0, false).
+		AddItem(d.recursos, 5, 0, false).
 		AddItem(tabelasGateways, 0, 2, false).
 		AddItem(d.conexoes, 0, 2, false).
 		AddItem(rodape, 0, 1, false)
@@ -255,20 +257,15 @@ func (d *Dashboard) AtualizaConexoes(conexoes []Conexao, ipSaida map[string]stri
 }
 
 // AtualizaRecursos lê o uso de CPU e RAM do host e redesenha o painel de
-// recursos, com uma barra ASCII pra cada um e um sparkline do histórico de
-// CPU dos últimos quantasAmostrasDeCPU segundos. Usa só caracteres ASCII
-// (não os blocos Unicode ▁▂▃.../█/░) porque esses têm largura ambígua e
-// bagunçavam o desenho em alguns terminais (ex: dentro de tmux).
+// recursos, com uma barra ASCII pra cada um. Usa só caracteres ASCII (não os
+// blocos Unicode ▁▂▃.../█/░) porque esses têm largura ambígua e bagunçavam o
+// desenho em alguns terminais (ex: dentro de tmux).
 func (d *Dashboard) AtualizaRecursos() {
 	atual, errCPU := lerCPUAmostra()
 	var cpuPct float64
 	if errCPU == nil {
 		if d.cpuTemAnterior {
 			cpuPct = percentualCPU(d.cpuAnterior, atual)
-			d.cpuHistorico = append(d.cpuHistorico, cpuPct)
-			if len(d.cpuHistorico) > quantasAmostrasDeCPU {
-				d.cpuHistorico = d.cpuHistorico[len(d.cpuHistorico)-quantasAmostrasDeCPU:]
-			}
 		}
 		d.cpuAnterior = atual
 		d.cpuTemAnterior = true
@@ -279,16 +276,74 @@ func (d *Dashboard) AtualizaRecursos() {
 		if d.pausado {
 			return
 		}
-		linhaCPU := fmt.Sprintf("CPU  %3.0f%%  (%s)   %s", cpuPct, barraBlocos(cpuPct, 20), sparkline(d.cpuHistorico))
+		d.linhaCPU = fmt.Sprintf("CPU  %3.0f%%  (%s)", cpuPct, barraBlocos(cpuPct, 20))
 		if errCPU != nil {
-			linhaCPU = fmt.Sprintf("CPU  --%%  %s", T("no_reading", errCPU))
+			d.linhaCPU = fmt.Sprintf("CPU  --%%  %s", T("no_reading", errCPU))
 		}
-		linhaRAM := fmt.Sprintf("RAM  %3.0f%%  (%s)   %.1f/%.1f GB", ramPct, barraBlocos(ramPct, 20), ramUsado, ramTotal)
+		d.linhaRAM = fmt.Sprintf("RAM  %3.0f%%  (%s)   %.1f/%.1f GB", ramPct, barraBlocos(ramPct, 20), ramUsado, ramTotal)
 		if errRAM != nil {
-			linhaRAM = fmt.Sprintf("RAM  --%%  %s", T("no_reading", errRAM))
+			d.linhaRAM = fmt.Sprintf("RAM  --%%  %s", T("no_reading", errRAM))
 		}
-		d.recursos.SetText(linhaCPU + "\n" + linhaRAM)
+		d.redesenhaRecursos()
 	})
+}
+
+// AtualizaThroughput recebe os totais acumulados de bytes do balanceador e
+// calcula a taxa de upload/download comparando com a leitura anterior, do
+// mesmo jeito que AtualizaRecursos calcula o uso de CPU a partir de duas
+// amostras de /proc/stat.
+func (d *Dashboard) AtualizaThroughput(uploadBytes, downloadBytes int64) {
+	agora := time.Now()
+	d.app.QueueUpdateDraw(func() {
+		if d.temAmostraDeRede {
+			decorrido := agora.Sub(d.amostraDeRedeQuando).Seconds()
+			if decorrido > 0 {
+				up := float64(uploadBytes-d.bytesUpAnterior) / decorrido
+				down := float64(downloadBytes-d.bytesDownAnterior) / decorrido
+				if up < 0 {
+					up = 0
+				}
+				if down < 0 {
+					down = 0
+				}
+				d.linhaNet = fmt.Sprintf("NET  up %s/s  down %s/s", formataTaxa(up), formataTaxa(down))
+			}
+		}
+		d.bytesUpAnterior = uploadBytes
+		d.bytesDownAnterior = downloadBytes
+		d.amostraDeRedeQuando = agora
+		d.temAmostraDeRede = true
+
+		if !d.pausado {
+			d.redesenhaRecursos()
+		}
+	})
+}
+
+// redesenhaRecursos junta as linhas de CPU, RAM e rede já formatadas num
+// único SetText. Só pode ser chamada de dentro de um QueueUpdateDraw que já
+// esteja rodando: chamar QueueUpdateDraw de novo aqui de dentro travaria,
+// porque o canal só é lido pelo próprio loop que estaria bloqueado chamando
+// esta função.
+func (d *Dashboard) redesenhaRecursos() {
+	texto := d.linhaCPU + "\n" + d.linhaRAM
+	if d.linhaNet != "" {
+		texto += "\n" + d.linhaNet
+	}
+	d.recursos.SetText(texto)
+}
+
+// formataTaxa escolhe a unidade (B, KB, MB por segundo) de acordo com a
+// grandeza, em vez de sempre mostrar um número de bytes cru.
+func formataTaxa(bytesPorSegundo float64) string {
+	switch {
+	case bytesPorSegundo >= 1<<20:
+		return fmt.Sprintf("%.1f MB", bytesPorSegundo/(1<<20))
+	case bytesPorSegundo >= 1<<10:
+		return fmt.Sprintf("%.1f KB", bytesPorSegundo/(1<<10))
+	default:
+		return fmt.Sprintf("%.0f B", bytesPorSegundo)
+	}
 }
 
 // duracaoResumida formata uma duração sem o nível de detalhe de segundos
@@ -316,26 +371,6 @@ func barraBlocos(percentual float64, largura int) string {
 	}
 	preenchido := int(percentual / 100 * float64(largura))
 	return strings.Repeat("#", preenchido) + strings.Repeat("-", largura-preenchido)
-}
-
-// nivelSparkline é uma rampa ASCII de 8 níveis (baixo pra alto), em vez dos
-// blocos Unicode ▁▂▃▄▅▆▇█, que têm largura ambígua e corrompem o desenho
-// em terminais/fontes que não os tratam como largura 1.
-var nivelSparkline = []rune(".-:=+*#@")
-
-func sparkline(amostras []float64) string {
-	var sb strings.Builder
-	for _, v := range amostras {
-		switch {
-		case v < 0:
-			v = 0
-		case v > 100:
-			v = 100
-		}
-		idx := int(v / 100 * float64(len(nivelSparkline)-1))
-		sb.WriteRune(nivelSparkline[idx])
-	}
-	return sb.String()
 }
 
 // Executa bloqueia rodando o loop de interface até o usuário sair (q ou ctrl-c).

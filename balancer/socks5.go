@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync/atomic"
 	"time"
 )
 
@@ -23,7 +24,7 @@ const (
 	tipoIPv6       = 0x04
 )
 
-func atendeCliente(conexao net.Conn, pool *Pool, timeoutConexao time.Duration, historico *HistoricoConexoes) {
+func atendeCliente(conexao net.Conn, pool *Pool, timeoutConexao time.Duration, historico *HistoricoConexoes, metricas *Metricas) {
 	defer conexao.Close()
 	conexao.SetDeadline(time.Now().Add(30 * time.Second))
 
@@ -63,7 +64,7 @@ func atendeCliente(conexao net.Conn, pool *Pool, timeoutConexao time.Duration, h
 	}
 
 	conexao.SetDeadline(time.Time{})
-	repassa(conexao, upstream)
+	repassa(conexao, upstream, metricas)
 }
 
 func saudacao(c net.Conn) error {
@@ -135,13 +136,29 @@ func responde(c net.Conn, codigo byte) error {
 	return err
 }
 
-func repassa(a, b net.Conn) {
+// escritorContador soma no contador cada byte que passa por Write, pra dar
+// pra medir a taxa de transferência em tempo real (não só o total quando a
+// conexão fecha, já que algumas ficam abertas por minutos).
+type escritorContador struct {
+	dst      io.Writer
+	contador *atomic.Int64
+}
+
+func (w *escritorContador) Write(p []byte) (int, error) {
+	n, err := w.dst.Write(p)
+	if n > 0 {
+		w.contador.Add(int64(n))
+	}
+	return n, err
+}
+
+func repassa(cliente, upstream net.Conn, metricas *Metricas) {
 	feito := make(chan struct{}, 2)
-	copia := func(dst, src net.Conn) {
-		io.Copy(dst, src)
+	copia := func(dst io.Writer, src io.Reader, contador *atomic.Int64) {
+		io.Copy(&escritorContador{dst: dst, contador: contador}, src)
 		feito <- struct{}{}
 	}
-	go copia(a, b)
-	go copia(b, a)
+	go copia(cliente, upstream, &metricas.bytesDownload) // destino -> gateway -> cliente
+	go copia(upstream, cliente, &metricas.bytesUpload)   // cliente -> gateway -> destino
 	<-feito
 }

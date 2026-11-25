@@ -27,9 +27,10 @@ func main() {
 	go rodaVerificacoes(pool, intervalo, limiteFalhas, alvoVerificacao, timeoutConexao)
 
 	historico := NovoHistorico(envInt("CONN_HISTORY", 20))
+	metricas := NovoMetricas()
 
 	if porta := env("API_PORT", ""); porta != "" {
-		serveStatus(pool, historico, ":"+porta)
+		serveStatus(pool, historico, metricas, ":"+porta)
 	}
 
 	escuta := ":" + env("SOCKS_PORT", "1080")
@@ -45,7 +46,7 @@ func main() {
 			log.Printf("erro ao aceitar conexão: %v", err)
 			continue
 		}
-		go atendeCliente(conn, pool, timeoutConexao, historico)
+		go atendeCliente(conn, pool, timeoutConexao, historico, metricas)
 	}
 }
 

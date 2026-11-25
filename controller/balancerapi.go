@@ -37,6 +37,31 @@ func ConexoesRecentes(enderecoAPI string) ([]Conexao, error) {
 	return conexoes, nil
 }
 
+// Throughput busca os totais acumulados de upload/download do balanceador.
+// Quem chama calcula a taxa comparando duas leituras no tempo, como o
+// dashboard já faz com a amostra de CPU do host.
+func Throughput(enderecoAPI string) (upload, download int64, err error) {
+	cliente := &http.Client{Timeout: 5 * time.Second}
+	resp, err := cliente.Get(enderecoAPI + "/throughput")
+	if err != nil {
+		return 0, 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, 0, fmt.Errorf("balanceador respondeu %d", resp.StatusCode)
+	}
+
+	var r struct {
+		UploadBytes   int64 `json:"upload_bytes"`
+		DownloadBytes int64 `json:"download_bytes"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return 0, 0, err
+	}
+	return r.UploadBytes, r.DownloadBytes, nil
+}
+
 // AtualizaBalanceador manda a lista atual de gateways ativos para o
 // endpoint PUT /gateways do balanceador, sem precisar reiniciá-lo.
 func AtualizaBalanceador(enderecoAPI string, enderecos []string) error {

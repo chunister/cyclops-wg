@@ -14,7 +14,7 @@ type statusGateway struct {
 // serveStatus expõe GET /status com o estado de cada gateway, e GET
 // /conexoes com as últimas conexões vistas. Serve para acompanhar a
 // rotação de fora, sem precisar ler o log.
-func serveStatus(pool *Pool, historico *HistoricoConexoes, endereco string) {
+func serveStatus(pool *Pool, historico *HistoricoConexoes, metricas *Metricas, endereco string) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		var lista []statusGateway
@@ -27,6 +27,16 @@ func serveStatus(pool *Pool, historico *HistoricoConexoes, endereco string) {
 	mux.HandleFunc("/conexoes", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(historico.Recentes())
+	})
+	// Totais acumulados de bytes trafegados pelo proxy. Quem lê compara duas
+	// chamadas no tempo pra chegar numa taxa (bytes/s), como o dashboard faz.
+	mux.HandleFunc("/throughput", func(w http.ResponseWriter, r *http.Request) {
+		upload, download := metricas.Totais()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(struct {
+			UploadBytes   int64 `json:"upload_bytes"`
+			DownloadBytes int64 `json:"download_bytes"`
+		}{upload, download})
 	})
 	// Só o controlador chama isso, para trocar quem está ativo sem reiniciar o balanceador.
 	mux.HandleFunc("/gateways", func(w http.ResponseWriter, r *http.Request) {
