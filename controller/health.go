@@ -108,13 +108,18 @@ func descartaEnderecoLigado(c net.Conn, atyp byte) error {
 	return err
 }
 
-func testaGateway(enderecoGateway, alvo string, timeout time.Duration) error {
+// testaGateway devolve também quanto tempo o CONNECT levou, pra alimentar a
+// coluna de ping do dashboard. A duração só é significativa quando err é
+// nil: numa falha ela só reflete o timeout, não uma latência real.
+func testaGateway(enderecoGateway, alvo string, timeout time.Duration) (time.Duration, error) {
+	inicio := time.Now()
 	c, err := conectaSocks5(enderecoGateway, alvo, timeout)
+	duracao := time.Since(inicio)
 	if err != nil {
-		return err
+		return duracao, err
 	}
 	c.Close()
-	return nil
+	return duracao, nil
 }
 
 // buscaIPSaida descobre o IP público que o gateway usa pra sair à internet,

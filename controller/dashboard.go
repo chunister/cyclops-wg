@@ -14,15 +14,15 @@ import (
 // Dashboard mostra o estado do controlador no terminal, ao vivo, no lugar
 // do log cru. É montado só quando DASHBOARD está ligado.
 type Dashboard struct {
-	app            *tview.Application
-	resumo         *tview.TextView
-	recursos       *tview.TextView
+	app             *tview.Application
+	resumo          *tview.TextView
+	recursos        *tview.TextView
 	tabelasGateways *tview.Flex
 	tabelaAtivos    *tview.Table
 	tabelaReservas  *tview.Table
 	conexoes        *tview.Table
-	eventos        *tview.TextView
-	atalhos        *tview.TextView
+	eventos         *tview.TextView
+	atalhos         *tview.TextView
 
 	cpuAnterior    cpuAmostra
 	cpuTemAnterior bool
@@ -184,7 +184,7 @@ func preencheTabelaGateways(tabela *tview.Table, slots []*Slot) {
 	tabela.Clear()
 	cabecalho := []string{
 		T("col_gateway"), T("col_server"), T("col_internal_ip"), T("col_exit_ip"),
-		T("col_last_switch"), T("col_failures"), T("col_state"),
+		T("col_ping"), T("col_last_switch"), T("col_failures"), T("col_state"),
 	}
 	for col, titulo := range cabecalho {
 		tabela.SetCell(0, col, tview.NewTableCell(titulo).
@@ -199,6 +199,10 @@ func preencheTabelaGateways(tabela *tview.Table, slots []*Slot) {
 			estado, cor = T("state_repairing"), tcell.ColorYellow
 		case s.Falhas > 0:
 			estado, cor = T("state_failing"), tcell.ColorRed
+		case s.PingMs >= limiarPingRuimMs:
+			// Conexão ok (sem falhas), mas lenta o bastante pra avisar sem
+			// tirar o gateway da rotação — isso quem decide é o HEALTH_FAILS.
+			estado, cor = T("state_degraded"), tcell.ColorYellow
 		}
 		linha := i + 1
 		tabela.SetCell(linha, 0, tview.NewTableCell(s.Nome))
@@ -211,14 +215,46 @@ func preencheTabelaGateways(tabela *tview.Table, slots []*Slot) {
 		}
 		tabela.SetCell(linha, 3, tview.NewTableCell(ipSaida).SetTextColor(tcell.ColorAqua))
 
+		ping := "-"
+		if s.PingMs > 0 {
+			ping = fmt.Sprintf("%dms", s.PingMs)
+		}
+		tabela.SetCell(linha, 4, tview.NewTableCell(ping).SetTextColor(corPing(s.PingMs)))
+
 		troca := "-"
 		if !s.UltimaTroca.IsZero() {
 			troca = T("time_ago", duracaoResumida(time.Since(s.UltimaTroca)))
 		}
-		tabela.SetCell(linha, 4, tview.NewTableCell(troca).SetTextColor(tcell.ColorGray))
+		tabela.SetCell(linha, 5, tview.NewTableCell(troca).SetTextColor(tcell.ColorGray))
 
-		tabela.SetCell(linha, 5, tview.NewTableCell(fmt.Sprintf("%d", s.Falhas)))
-		tabela.SetCell(linha, 6, tview.NewTableCell(estado).SetTextColor(cor))
+		tabela.SetCell(linha, 6, tview.NewTableCell(fmt.Sprintf("%d", s.Falhas)))
+		tabela.SetCell(linha, 7, tview.NewTableCell(estado).SetTextColor(cor))
+	}
+}
+
+// limiarPingBomMs e limiarPingRuimMs marcam as faixas de cor da coluna de
+// ping: abaixo do primeiro fica verde, entre os dois fica amarelo, acima do
+// segundo fica vermelho. São só um ponto de partida razoável pra túneis
+// WireGuard de distâncias bem variadas; ajuste se achar que não bate com o
+// que você considera "bom" ou "ruim" na sua rede.
+const (
+	limiarPingBomMs  = 150
+	limiarPingRuimMs = 350
+)
+
+// corPing escolhe a cor da coluna de ping pelo mesmo princípio da coluna de
+// estado: um jeito de bater o olho e já saber se tá bom, no limite ou ruim,
+// sem precisar comparar números.
+func corPing(ms int64) tcell.Color {
+	switch {
+	case ms <= 0:
+		return tcell.ColorGray
+	case ms < limiarPingBomMs:
+		return tcell.ColorGreen
+	case ms < limiarPingRuimMs:
+		return tcell.ColorYellow
+	default:
+		return tcell.ColorRed
 	}
 }
 

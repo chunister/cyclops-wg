@@ -24,6 +24,7 @@ type Slot struct {
 	IPSaida     string
 	Papel       string
 	Falhas      int
+	PingMs      int64 // último round-trip do health check bem-sucedido; 0 = nunca medido
 	UltimaTroca time.Time
 	EmReparo    bool `json:"-"`
 }
@@ -270,13 +271,14 @@ func (c *Controlador) cicloDeReconciliacao(ctx context.Context) {
 			}
 			s.IP = ip
 		}
-		err := testaGateway(s.IP+":1090", "1.1.1.1:443", 8*time.Second)
+		duracao, err := testaGateway(s.IP+":1090", c.cfg.HealthTarget, time.Duration(c.cfg.DialTimeout)*time.Second)
 		c.mu.Lock()
 		if err != nil {
 			s.Falhas++
 			log.Print(T("log_health_check_failed", s.Nome, s.Papel, s.Falhas, err))
 		} else {
 			s.Falhas = 0
+			s.PingMs = duracao.Milliseconds()
 		}
 		c.mu.Unlock()
 	}

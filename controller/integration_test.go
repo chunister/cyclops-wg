@@ -31,7 +31,7 @@ func TestIntegracaoComBalanceadorReal(t *testing.T) {
 
 	time.Sleep(500 * time.Millisecond)
 
-	if err := testaGateway("127.0.0.1:1095", "1.1.1.1:443", 5*time.Second); err != nil {
+	if _, err := testaGateway("127.0.0.1:1095", "1.1.1.1:443", 5*time.Second); err != nil {
 		t.Fatalf("testaGateway deveria passar: %v", err)
 	}
 
@@ -39,7 +39,7 @@ func TestIntegracaoComBalanceadorReal(t *testing.T) {
 		t.Fatalf("AtualizaBalanceador falhou: %v", err)
 	}
 
-	if err := testaGateway("127.0.0.1:1", "1.1.1.1:443", 300*time.Millisecond); err == nil {
+	if _, err := testaGateway("127.0.0.1:1", "1.1.1.1:443", 300*time.Millisecond); err == nil {
 		t.Fatal("testaGateway deveria falhar contra um endereço inexistente")
 	}
 }
