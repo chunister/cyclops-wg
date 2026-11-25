@@ -68,6 +68,8 @@ Para uma próxima rodada: o balanceador pode ganhar suporte a `UDP ASSOCIATE`, o
 
 ## Requisitos no host
 
+Em Debian 13, Kali GNU/Linux atual ou Ubuntu, `sudo scripts/install-deps.sh` instala tudo isto de uma vez (Docker, Compose v2, Go e o módulo WireGuard). Em outra distro, ou se preferir instalar na mão, segue a lista:
+
 - Kernel Linux com o módulo WireGuard carregado (`sudo modprobe wireguard`). O `wireguard-tools` (`wg`) em si só é usado dentro do container do gateway, instalado pelo próprio `Dockerfile` — não precisa instalar no host, mas a [página de instalação](https://www.wireguard.com/install/) existe se quiser testar fora do projeto. Testado em Kali GNU/Linux 2025.4, kernel `6.16.8+kali-amd64`.
 - [Docker Engine](https://docs.docker.com/engine/install/) 27 ou mais recente, com Compose v2 (para o teste rápido) e acesso ao socket do Docker (para o controlador). Testado com Docker `27.5.1+dfsg4` e Docker Compose `v2.32.4-3`.
 - [Go](https://go.dev/doc/install), só para compilar o controlador. O `go.mod` pede Go 1.26 (puxado pelo SDK do Docker); com `GOTOOLCHAIN=auto` (padrão do Go 1.21+), o próprio `go build` baixa o toolchain certo se o instalado for mais antigo. Testado com `go1.26.3`.
