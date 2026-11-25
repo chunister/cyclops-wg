@@ -35,15 +35,46 @@ type Config struct {
 	LogFile            string // "" desliga; além da tela, grava o log também num arquivo
 }
 
+// diretorioExecutavel devolve a pasta onde o binário compilado do
+// controlador está (via /proc/self/exe), não o diretório de onde ele foi
+// chamado (esse é o pwd, e é exatamente o que causa o problema: muda
+// conforme de onde você roda "./controller"). É a partir daqui, não do pwd,
+// que os caminhos relativos abaixo são ancorados, pra funcionar igual não
+// importa se você chama de dentro de controller/, por um caminho absoluto
+// de outro lugar, ou via systemd com outro WorkingDirectory. Se não der pra
+// descobrir (bem raro), cai pra "." e volta a depender do pwd, só como
+// último recurso.
+func diretorioExecutavel() string {
+	caminho, err := os.Executable()
+	if err != nil {
+		return "."
+	}
+	if resolvido, err := filepath.EvalSymlinks(caminho); err == nil {
+		caminho = resolvido
+	}
+	return filepath.Dir(caminho)
+}
+
+// resolveRelativo ancora um caminho relativo (seja o default ou um valor
+// vindo do .env) na pasta do executável. Um caminho já absoluto passa
+// direto, sem mudança.
+func resolveRelativo(base, caminho string) string {
+	if caminho == "" || filepath.IsAbs(caminho) {
+		return caminho
+	}
+	return filepath.Join(base, caminho)
+}
+
 func carregaConfig() Config {
-	raiz := env("REPO_ROOT", "..")
+	exeDir := diretorioExecutavel()
+	raiz := resolveRelativo(exeDir, env("REPO_ROOT", ".."))
 	return Config{
 		GatewayCount:       envInt("GATEWAY_COUNT", 10),
 		SpareCount:         envInt("SPARE_COUNT", 3),
 		WGPrivateKey:       env("WG_PRIVATE_KEY", ""),
 		WGAddress:          env("WG_ADDRESS", "10.14.0.2/16"),
-		ServersDir:         env("SERVERS_DIR", filepath.Join(raiz, "servers")),
-		StateFile:          env("STATE_FILE", "./controller-state.json"),
+		ServersDir:         resolveRelativo(exeDir, env("SERVERS_DIR", filepath.Join(raiz, "servers"))),
+		StateFile:          resolveRelativo(exeDir, env("STATE_FILE", "./controller-state.json")),
 		RepoRoot:           raiz,
 		NetworkName:        env("DOCKER_NETWORK", "cyclops-net"),
 		GatewayImage:       env("GATEWAY_IMAGE", "cyclops-gateway:dev"),
@@ -61,7 +92,7 @@ func carregaConfig() Config {
 		HealthTarget:       env("HEALTH_TARGET", "1.1.1.1:443"),
 		DialTimeout:        envInt("DIAL_TIMEOUT", 10),
 		ConnHistory:        envInt("CONN_HISTORY", 20),
-		LogFile:            env("LOG_FILE", "./controller.log"),
+		LogFile:            resolveRelativo(exeDir, env("LOG_FILE", "./controller.log")),
 	}
 }
 
