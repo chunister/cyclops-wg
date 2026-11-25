@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -25,6 +26,7 @@ type Config struct {
 	SocksPort      string
 	ApiPort        string
 	ControllerPort string
+	Dashboard      bool
 }
 
 func carregaConfig() Config {
@@ -47,6 +49,7 @@ func carregaConfig() Config {
 		SocksPort:      env("SOCKS_PORT", "1080"),
 		ApiPort:        env("API_PORT", "8081"),
 		ControllerPort: env("CONTROLLER_PORT", "9090"),
+		Dashboard:      envBool("DASHBOARD", true),
 	}
 }
 
@@ -68,4 +71,20 @@ func envInt(chave string, padrao int) int {
 		return padrao
 	}
 	return n
+}
+
+func envBool(chave string, padrao bool) bool {
+	v := os.Getenv(chave)
+	if v == "" {
+		return padrao
+	}
+	switch strings.ToLower(v) {
+	case "0", "false", "nao", "não":
+		return false
+	case "1", "true", "sim":
+		return true
+	default:
+		log.Printf("valor inválido em %s=%q, usando %v", chave, v, padrao)
+		return padrao
+	}
 }

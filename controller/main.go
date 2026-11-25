@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 )
@@ -76,11 +77,53 @@ func main() {
 
 	ctrl.serveStatus()
 
-	ticker := time.NewTicker(time.Duration(cfg.HealthInterval) * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		ctrl.cicloDeReconciliacao(ctx)
+	if !cfg.Dashboard {
+		ticker := time.NewTicker(time.Duration(cfg.HealthInterval) * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			ctrl.cicloDeReconciliacao(ctx)
+		}
+		return
 	}
+
+	inicio := time.Now()
+	dash := NovoDashboard()
+	log.SetOutput(dash)
+
+	go func() {
+		ticker := time.NewTicker(time.Duration(cfg.HealthInterval) * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			ctrl.cicloDeReconciliacao(ctx)
+		}
+	}()
+
+	go func() {
+		redesenha := time.NewTicker(time.Second)
+		defer redesenha.Stop()
+		for range redesenha.C {
+			dash.Atualiza(inicio, ctrl.CopiaSlots())
+		}
+	}()
+
+	dash.Atualiza(inicio, ctrl.CopiaSlots())
+	if err := dash.Executa(); err != nil {
+		fmt.Printf("dashboard: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// CopiaSlots devolve uma cópia dos slots atuais, segura para o dashboard
+// desenhar sem segurar o mutex do controlador durante o redesenho.
+func (c *Controlador) CopiaSlots() []*Slot {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	copia := make([]*Slot, len(c.slots))
+	for i, s := range c.slots {
+		cp := *s
+		copia[i] = &cp
+	}
+	return copia
 }
 
 // sobeTudo cria do zero os N+M gateways e o balanceador, e espera o

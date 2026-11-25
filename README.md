@@ -52,7 +52,9 @@ set -a && source ../.env && set +a
 sudo -E ./controller
 ```
 
-O controlador precisa de privilégio para falar com o Docker (ou que seu usuário esteja no grupo `docker`), e vai gerenciar os containers direto, sem `docker-compose.yml`. Acompanhe `curl -s http://127.0.0.1:9090/status` para ver o papel (ativo ou reserva) e a saúde de cada gateway.
+O controlador precisa de privilégio para falar com o Docker (ou que seu usuário esteja no grupo `docker`), e vai gerenciar os containers direto, sem `docker-compose.yml`.
+
+Por padrão, o terminal onde o controlador roda vira um dashboard ao vivo: um resumo no topo (quantos ativos e reservas estão saudáveis, há quanto tempo está no ar), uma tabela com cada gateway (papel, servidor, IP, falhas seguidas, estado), e um painel de eventos embaixo com o mesmo log que antes ia pro terminal cru. Aperte `q` ou `Ctrl-C` pra sair; os containers continuam rodando normalmente depois que o controlador fecha. Para rodar sem essa tela (por exemplo, atrás de `nohup` ou um serviço systemd, sem terminal interativo), defina `DASHBOARD=0` no `.env` e acompanhe pelo `curl -s http://127.0.0.1:9090/status` em vez disso.
 
 ## Limitações conhecidas
 

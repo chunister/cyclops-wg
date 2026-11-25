@@ -52,7 +52,9 @@ set -a && source ../.env && set +a
 sudo -E ./controller
 ```
 
-The controller needs enough privilege to talk to Docker (or your user in the `docker` group), and manages containers directly, without `docker-compose.yml`. Watch `curl -s http://127.0.0.1:9090/status` to see each gateway's role (active or spare) and health.
+The controller needs enough privilege to talk to Docker (or your user in the `docker` group), and manages containers directly, without `docker-compose.yml`.
+
+By default, the terminal where the controller runs turns into a live dashboard: a summary at the top (how many active and spare gateways are healthy, how long it's been running), a table with each gateway (role, server, IP, failures in a row, state), and an events panel at the bottom with the same log that used to go straight to the terminal. Press `q` or `Ctrl-C` to quit; the containers keep running after the controller closes. To run without this screen (for example behind `nohup` or a systemd service, with no interactive terminal), set `DASHBOARD=0` in `.env` and watch `curl -s http://127.0.0.1:9090/status` instead.
 
 ## Known limitations
 
