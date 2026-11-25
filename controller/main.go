@@ -20,6 +20,7 @@ type Slot struct {
 	Nome     string
 	Servidor string
 	IP       string
+	IPSaida  string
 	Papel    string
 	Falhas   int
 	EmReparo bool `json:"-"`
@@ -181,6 +182,11 @@ func (c *Controlador) sobeTudo(ctx context.Context) error {
 			continue
 		}
 		s.IP = ip
+		if saida, err := buscaIPSaida(ip+":1090", 8*time.Second); err == nil {
+			s.IPSaida = saida
+		} else {
+			log.Printf("não consegui descobrir o IP de saída de %s: %v", s.Nome, err)
+		}
 	}
 
 	return c.publicaAtivos()
@@ -353,6 +359,14 @@ func (c *Controlador) reequilibraServidor(ctx context.Context, s *Slot) {
 	s.Servidor = novoServidor
 	c.mu.Unlock()
 	log.Printf("%s agora aponta para %s", s.Nome, novoServidor)
+
+	if saida, err := buscaIPSaida(s.IP+":1090", 8*time.Second); err == nil {
+		c.mu.Lock()
+		s.IPSaida = saida
+		c.mu.Unlock()
+	} else {
+		log.Printf("não consegui descobrir o novo IP de saída de %s: %v", s.Nome, err)
+	}
 }
 
 func (c *Controlador) serveStatus() {

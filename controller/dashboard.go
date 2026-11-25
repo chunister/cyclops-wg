@@ -88,7 +88,7 @@ func (d *Dashboard) Atualiza(inicio time.Time, slots []*Slot) {
 		))
 
 		d.tabela.Clear()
-		cabecalho := []string{"GATEWAY", "PAPEL", "SERVIDOR", "IP", "FALHAS", "ESTADO"}
+		cabecalho := []string{"GATEWAY", "PAPEL", "SERVIDOR", "IP INTERNO", "IP SAÍDA", "FALHAS", "ESTADO"}
 		for col, titulo := range cabecalho {
 			d.tabela.SetCell(0, col, tview.NewTableCell(titulo).
 				SetTextColor(tcell.ColorYellow).
@@ -116,8 +116,13 @@ func (d *Dashboard) Atualiza(inicio time.Time, slots []*Slot) {
 			d.tabela.SetCell(linha, 1, tview.NewTableCell(s.Papel))
 			d.tabela.SetCell(linha, 2, tview.NewTableCell(s.Servidor))
 			d.tabela.SetCell(linha, 3, tview.NewTableCell(s.IP))
-			d.tabela.SetCell(linha, 4, tview.NewTableCell(fmt.Sprintf("%d", s.Falhas)))
-			d.tabela.SetCell(linha, 5, tview.NewTableCell(estado).SetTextColor(cor))
+			ipSaida := s.IPSaida
+			if ipSaida == "" {
+				ipSaida = "..."
+			}
+			d.tabela.SetCell(linha, 4, tview.NewTableCell(ipSaida).SetTextColor(tcell.ColorAqua))
+			d.tabela.SetCell(linha, 5, tview.NewTableCell(fmt.Sprintf("%d", s.Falhas)))
+			d.tabela.SetCell(linha, 6, tview.NewTableCell(estado).SetTextColor(cor))
 		}
 	})
 }
