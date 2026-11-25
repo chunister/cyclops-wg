@@ -41,9 +41,9 @@ func NovoDashboard() *Dashboard {
 		app:            tview.NewApplication(),
 		resumo:         tview.NewTextView().SetDynamicColors(true),
 		recursos:       tview.NewTextView().SetDynamicColors(true),
-		tabelaAtivos:   tview.NewTable().SetBorders(false),
-		tabelaReservas: tview.NewTable().SetBorders(false),
-		conexoes:       tview.NewTable().SetBorders(false),
+		tabelaAtivos:   tview.NewTable().SetBorders(false).SetFixed(1, 0),
+		tabelaReservas: tview.NewTable().SetBorders(false).SetFixed(1, 0),
+		conexoes:       tview.NewTable().SetBorders(false).SetFixed(1, 0),
 		eventos:        tview.NewTextView().SetDynamicColors(true).SetScrollable(true).SetMaxLines(500),
 		atalhos:        tview.NewTextView().SetDynamicColors(true),
 	}
