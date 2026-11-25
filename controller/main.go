@@ -17,13 +17,14 @@ const papelAtivo = "ativo"
 const papelReserva = "reserva"
 
 type Slot struct {
-	Nome     string
-	Servidor string
-	IP       string
-	IPSaida  string
-	Papel    string
-	Falhas   int
-	EmReparo bool `json:"-"`
+	Nome        string
+	Servidor    string
+	IP          string
+	IPSaida     string
+	Papel       string
+	Falhas      int
+	UltimaTroca time.Time
+	EmReparo    bool `json:"-"`
 }
 
 type Controlador struct {
@@ -171,7 +172,7 @@ func (c *Controlador) sobeTudo(ctx context.Context) error {
 		if i > c.cfg.GatewayCount {
 			papel = papelReserva
 		}
-		c.slots = append(c.slots, &Slot{Nome: nome, Servidor: servidor, Papel: papel})
+		c.slots = append(c.slots, &Slot{Nome: nome, Servidor: servidor, Papel: papel, UltimaTroca: time.Now()})
 	}
 
 	if err := c.docker.CriaBalanceador(ctx); err != nil {
@@ -362,6 +363,7 @@ func (c *Controlador) reequilibraServidor(ctx context.Context, s *Slot) {
 
 	c.mu.Lock()
 	s.Servidor = novoServidor
+	s.UltimaTroca = time.Now()
 	c.mu.Unlock()
 	log.Printf("%s agora aponta para %s", s.Nome, novoServidor)
 

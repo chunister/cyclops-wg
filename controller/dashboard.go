@@ -19,12 +19,13 @@ const quantasAmostrasDeCPU = 60
 // Dashboard mostra o estado do controlador no terminal, ao vivo, no lugar
 // do log cru. É montado só quando DASHBOARD está ligado.
 type Dashboard struct {
-	app      *tview.Application
-	resumo   *tview.TextView
-	recursos *tview.TextView
-	tabela   *tview.Table
-	conexoes *tview.Table
-	eventos  *tview.TextView
+	app            *tview.Application
+	resumo         *tview.TextView
+	recursos       *tview.TextView
+	tabelaAtivos   *tview.Table
+	tabelaReservas *tview.Table
+	conexoes       *tview.Table
+	eventos        *tview.TextView
 
 	cpuAnterior    cpuAmostra
 	cpuTemAnterior bool
@@ -33,25 +34,31 @@ type Dashboard struct {
 
 func NovoDashboard() *Dashboard {
 	d := &Dashboard{
-		app:      tview.NewApplication(),
-		resumo:   tview.NewTextView().SetDynamicColors(true),
-		recursos: tview.NewTextView().SetDynamicColors(true),
-		tabela:   tview.NewTable().SetBorders(false),
-		conexoes: tview.NewTable().SetBorders(false),
-		eventos:  tview.NewTextView().SetDynamicColors(true).SetScrollable(true).SetMaxLines(500),
+		app:            tview.NewApplication(),
+		resumo:         tview.NewTextView().SetDynamicColors(true),
+		recursos:       tview.NewTextView().SetDynamicColors(true),
+		tabelaAtivos:   tview.NewTable().SetBorders(false),
+		tabelaReservas: tview.NewTable().SetBorders(false),
+		conexoes:       tview.NewTable().SetBorders(false),
+		eventos:        tview.NewTextView().SetDynamicColors(true).SetScrollable(true).SetMaxLines(500),
 	}
 	d.eventos.SetChangedFunc(func() { d.eventos.ScrollToEnd() })
 
 	d.resumo.SetBorder(true).SetTitle(" cyclops-wg ")
 	d.recursos.SetBorder(true).SetTitle(" recursos (host) ")
-	d.tabela.SetBorder(true).SetTitle(" gateways ")
+	d.tabelaAtivos.SetBorder(true).SetTitle(" ativos ")
+	d.tabelaReservas.SetBorder(true).SetTitle(" reservas ")
 	d.conexoes.SetBorder(true).SetTitle(" conexões recentes ")
 	d.eventos.SetBorder(true).SetTitle(" eventos (q ou ctrl-c pra sair) ")
+
+	tabelasGateways := tview.NewFlex().SetDirection(tview.FlexColumn).
+		AddItem(d.tabelaAtivos, 0, 1, false).
+		AddItem(d.tabelaReservas, 0, 1, false)
 
 	layout := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(d.resumo, 3, 0, false).
 		AddItem(d.recursos, 4, 0, false).
-		AddItem(d.tabela, 0, 2, false).
+		AddItem(tabelasGateways, 0, 2, false).
 		AddItem(d.conexoes, 0, 2, false).
 		AddItem(d.eventos, 0, 1, false)
 
@@ -77,68 +84,80 @@ func (d *Dashboard) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Atualiza redesenha o resumo e a tabela a partir de uma cópia do estado
-// atual dos slots, tirada com o mutex do controlador já liberado.
+// Atualiza redesenha o resumo e as tabelas de ativos/reservas a partir de
+// uma cópia do estado atual dos slots, tirada com o mutex do controlador
+// já liberado.
 func (d *Dashboard) Atualiza(inicio time.Time, slots []*Slot) {
 	d.app.QueueUpdateDraw(func() {
-		ativosOk, ativosTotal, reservaOk, reservaTotal := 0, 0, 0, 0
+		var ativos, reservas []*Slot
+		ativosOk, reservaOk := 0, 0
 		for _, s := range slots {
 			if s.Papel == papelAtivo {
-				ativosTotal++
+				ativos = append(ativos, s)
 				if s.Falhas == 0 {
 					ativosOk++
 				}
 			} else {
-				reservaTotal++
+				reservas = append(reservas, s)
 				if s.Falhas == 0 && !s.EmReparo {
 					reservaOk++
 				}
 			}
 		}
+		sort.Slice(ativos, func(i, j int) bool { return ativos[i].Nome < ativos[j].Nome })
+		sort.Slice(reservas, func(i, j int) bool { return reservas[i].Nome < reservas[j].Nome })
+
 		uptime := time.Since(inicio).Round(time.Second)
 		d.resumo.SetText(fmt.Sprintf(
 			"ativos saudáveis: [green]%d[white]/%d    reservas saudáveis: [green]%d[white]/%d    no ar há %s",
-			ativosOk, ativosTotal, reservaOk, reservaTotal, uptime,
+			ativosOk, len(ativos), reservaOk, len(reservas), uptime,
 		))
 
-		d.tabela.Clear()
-		cabecalho := []string{"GATEWAY", "PAPEL", "SERVIDOR", "IP INTERNO", "IP SAÍDA", "FALHAS", "ESTADO"}
-		for col, titulo := range cabecalho {
-			d.tabela.SetCell(0, col, tview.NewTableCell(titulo).
-				SetTextColor(tcell.ColorYellow).
-				SetSelectable(false))
-		}
-
-		ordenados := append([]*Slot{}, slots...)
-		sort.Slice(ordenados, func(i, j int) bool {
-			if ordenados[i].Papel != ordenados[j].Papel {
-				return ordenados[i].Papel == papelAtivo
-			}
-			return ordenados[i].Nome < ordenados[j].Nome
-		})
-
-		for i, s := range ordenados {
-			estado, cor := "saudável", tcell.ColorGreen
-			switch {
-			case s.EmReparo:
-				estado, cor = "reparando", tcell.ColorYellow
-			case s.Falhas > 0:
-				estado, cor = "falhando", tcell.ColorRed
-			}
-			linha := i + 1
-			d.tabela.SetCell(linha, 0, tview.NewTableCell(s.Nome))
-			d.tabela.SetCell(linha, 1, tview.NewTableCell(s.Papel))
-			d.tabela.SetCell(linha, 2, tview.NewTableCell(s.Servidor))
-			d.tabela.SetCell(linha, 3, tview.NewTableCell(s.IP))
-			ipSaida := s.IPSaida
-			if ipSaida == "" {
-				ipSaida = "..."
-			}
-			d.tabela.SetCell(linha, 4, tview.NewTableCell(ipSaida).SetTextColor(tcell.ColorAqua))
-			d.tabela.SetCell(linha, 5, tview.NewTableCell(fmt.Sprintf("%d", s.Falhas)))
-			d.tabela.SetCell(linha, 6, tview.NewTableCell(estado).SetTextColor(cor))
-		}
+		preencheTabelaGateways(d.tabelaAtivos, ativos)
+		preencheTabelaGateways(d.tabelaReservas, reservas)
 	})
+}
+
+// preencheTabelaGateways redesenha uma das duas tabelas de gateway (ativos
+// ou reservas). O papel não precisa de coluna própria: já está no título
+// de qual das duas tabelas é essa.
+func preencheTabelaGateways(tabela *tview.Table, slots []*Slot) {
+	tabela.Clear()
+	cabecalho := []string{"GATEWAY", "SERVIDOR", "IP INTERNO", "IP SAÍDA", "ÚLT. TROCA", "FALHAS", "ESTADO"}
+	for col, titulo := range cabecalho {
+		tabela.SetCell(0, col, tview.NewTableCell(titulo).
+			SetTextColor(tcell.ColorYellow).
+			SetSelectable(false))
+	}
+
+	for i, s := range slots {
+		estado, cor := "saudável", tcell.ColorGreen
+		switch {
+		case s.EmReparo:
+			estado, cor = "reparando", tcell.ColorYellow
+		case s.Falhas > 0:
+			estado, cor = "falhando", tcell.ColorRed
+		}
+		linha := i + 1
+		tabela.SetCell(linha, 0, tview.NewTableCell(s.Nome))
+		tabela.SetCell(linha, 1, tview.NewTableCell(s.Servidor))
+		tabela.SetCell(linha, 2, tview.NewTableCell(s.IP))
+
+		ipSaida := s.IPSaida
+		if ipSaida == "" {
+			ipSaida = "..."
+		}
+		tabela.SetCell(linha, 3, tview.NewTableCell(ipSaida).SetTextColor(tcell.ColorAqua))
+
+		troca := "-"
+		if !s.UltimaTroca.IsZero() {
+			troca = "há " + time.Since(s.UltimaTroca).Round(time.Second).String()
+		}
+		tabela.SetCell(linha, 4, tview.NewTableCell(troca).SetTextColor(tcell.ColorGray))
+
+		tabela.SetCell(linha, 5, tview.NewTableCell(fmt.Sprintf("%d", s.Falhas)))
+		tabela.SetCell(linha, 6, tview.NewTableCell(estado).SetTextColor(cor))
+	}
 }
 
 // AtualizaConexoes redesenha a tabela de conexões recentes, mais nova primeiro.
@@ -177,8 +196,10 @@ func (d *Dashboard) AtualizaConexoes(conexoes []Conexao, ipSaida map[string]stri
 }
 
 // AtualizaRecursos lê o uso de CPU e RAM do host e redesenha o painel de
-// recursos, com uma barra de blocos pra cada um e um sparkline do histórico
-// de CPU dos últimos quantasAmostrasDeCPU segundos.
+// recursos, com uma barra ASCII pra cada um e um sparkline do histórico de
+// CPU dos últimos quantasAmostrasDeCPU segundos. Usa só caracteres ASCII
+// (não os blocos Unicode ▁▂▃.../█/░) porque esses têm largura ambígua e
+// bagunçavam o desenho em alguns terminais (ex: dentro de tmux).
 func (d *Dashboard) AtualizaRecursos() {
 	atual, errCPU := lerCPUAmostra()
 	var cpuPct float64
@@ -196,11 +217,11 @@ func (d *Dashboard) AtualizaRecursos() {
 	ramPct, ramUsado, ramTotal, errRAM := usoRAM()
 
 	d.app.QueueUpdateDraw(func() {
-		linhaCPU := fmt.Sprintf("CPU  %3.0f%%  [%s]   %s", cpuPct, barraBlocos(cpuPct, 20), sparkline(d.cpuHistorico))
+		linhaCPU := fmt.Sprintf("CPU  %3.0f%%  (%s)   %s", cpuPct, barraBlocos(cpuPct, 20), sparkline(d.cpuHistorico))
 		if errCPU != nil {
 			linhaCPU = fmt.Sprintf("CPU  --%%  (sem leitura: %v)", errCPU)
 		}
-		linhaRAM := fmt.Sprintf("RAM  %3.0f%%  [%s]   %.1f/%.1f GB", ramPct, barraBlocos(ramPct, 20), ramUsado, ramTotal)
+		linhaRAM := fmt.Sprintf("RAM  %3.0f%%  (%s)   %.1f/%.1f GB", ramPct, barraBlocos(ramPct, 20), ramUsado, ramTotal)
 		if errRAM != nil {
 			linhaRAM = fmt.Sprintf("RAM  --%%  (sem leitura: %v)", errRAM)
 		}
@@ -216,10 +237,13 @@ func barraBlocos(percentual float64, largura int) string {
 		percentual = 100
 	}
 	preenchido := int(percentual / 100 * float64(largura))
-	return strings.Repeat("█", preenchido) + strings.Repeat("░", largura-preenchido)
+	return strings.Repeat("#", preenchido) + strings.Repeat("-", largura-preenchido)
 }
 
-var nivelSparkline = []rune("▁▂▃▄▅▆▇█")
+// nivelSparkline é uma rampa ASCII de 8 níveis (baixo pra alto), em vez dos
+// blocos Unicode ▁▂▃▄▅▆▇█, que têm largura ambígua e corrompem o desenho
+// em terminais/fontes que não os tratam como largura 1.
+var nivelSparkline = []rune(".-:=+*#@")
 
 func sparkline(amostras []float64) string {
 	var sb strings.Builder
