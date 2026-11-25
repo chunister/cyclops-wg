@@ -104,6 +104,7 @@ func main() {
 		defer redesenha.Stop()
 		for range redesenha.C {
 			dash.Atualiza(inicio, ctrl.CopiaSlots())
+			dash.AtualizaRecursos()
 		}
 	}()
 
@@ -115,7 +116,11 @@ func main() {
 			if err != nil {
 				continue
 			}
-			dash.AtualizaConexoes(conexoes)
+			ipSaida := map[string]string{}
+			for _, s := range ctrl.CopiaSlots() {
+				ipSaida[s.IP] = s.IPSaida
+			}
+			dash.AtualizaConexoes(conexoes, ipSaida)
 		}
 	}()
 
