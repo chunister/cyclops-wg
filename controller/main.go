@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -92,6 +93,13 @@ func main() {
 	}
 
 	if !cfg.Dashboard {
+		destinos := []io.Writer{os.Stderr}
+		if arquivo, ok := abreArquivoDeLog(cfg.LogFile); ok {
+			defer arquivo.Close()
+			destinos = append(destinos, arquivo)
+		}
+		log.SetOutput(io.MultiWriter(destinos...))
+
 		ticker := time.NewTicker(time.Duration(cfg.HealthInterval) * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
@@ -102,7 +110,12 @@ func main() {
 
 	inicio := time.Now()
 	dash := NovoDashboard()
-	log.SetOutput(dash)
+	destinos := []io.Writer{dash}
+	if arquivo, ok := abreArquivoDeLog(cfg.LogFile); ok {
+		defer arquivo.Close()
+		destinos = append(destinos, arquivo)
+	}
+	log.SetOutput(io.MultiWriter(destinos...))
 	dash.DefinirAoRenovar(func() { go ctrl.rotacionaTodos(ctx) })
 
 	go func() {
@@ -142,6 +155,22 @@ func main() {
 		fmt.Printf("dashboard: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// abreArquivoDeLog abre (ou cria) o arquivo de log em modo de acréscimo, pra
+// dar pra revisar o que aconteceu mesmo depois que o painel de eventos (que
+// só guarda as últimas 500 linhas) ou o terminal ficarem difíceis de ler,
+// como num teste de carga. caminho vazio desliga o recurso.
+func abreArquivoDeLog(caminho string) (*os.File, bool) {
+	if caminho == "" {
+		return nil, false
+	}
+	arquivo, err := os.OpenFile(caminho, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Print(T("log_file_open_failed", caminho, err))
+		return nil, false
+	}
+	return arquivo, true
 }
 
 // CopiaSlots devolve uma cópia dos slots atuais, segura para o dashboard

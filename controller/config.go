@@ -29,6 +29,10 @@ type Config struct {
 	Dashboard          bool
 	FullRotateInterval int // segundos; 0 desliga a rotação periódica completa
 	Lang               string
+	HealthTarget       string // alvo usado pelo balanceador pra testar cada gateway
+	DialTimeout        int    // segundos; tempo máximo de uma conexão de teste do balanceador
+	ConnHistory        int    // quantas conexões recentes o balanceador guarda em memória
+	LogFile            string // "" desliga; além da tela, grava o log também num arquivo
 }
 
 func carregaConfig() Config {
@@ -54,6 +58,10 @@ func carregaConfig() Config {
 		Dashboard:          envBool("DASHBOARD", true),
 		FullRotateInterval: envInt("FULL_ROTATE_INTERVAL", 0),
 		Lang:               env("DASH_LANG", "en"),
+		HealthTarget:       env("HEALTH_TARGET", "1.1.1.1:443"),
+		DialTimeout:        envInt("DIAL_TIMEOUT", 10),
+		ConnHistory:        envInt("CONN_HISTORY", 20),
+		LogFile:            env("LOG_FILE", "./controller.log"),
 	}
 }
 

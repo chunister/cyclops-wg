@@ -108,6 +108,9 @@ func (d *Docker) CriaBalanceador(ctx context.Context) error {
 			"API_PORT=8081",
 			fmt.Sprintf("HEALTH_INTERVAL=%d", d.cfg.HealthInterval),
 			fmt.Sprintf("HEALTH_FAILS=%d", d.cfg.HealthFails),
+			fmt.Sprintf("HEALTH_TARGET=%s", d.cfg.HealthTarget),
+			fmt.Sprintf("DIAL_TIMEOUT=%d", d.cfg.DialTimeout),
+			fmt.Sprintf("CONN_HISTORY=%d", d.cfg.ConnHistory),
 		},
 		ExposedPorts: nat.PortSet{
 			"1080/tcp": struct{}{},

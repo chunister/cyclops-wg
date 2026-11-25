@@ -207,7 +207,7 @@ func preencheTabelaGateways(tabela *tview.Table, slots []*Slot) {
 
 		troca := "-"
 		if !s.UltimaTroca.IsZero() {
-			troca = T("time_ago", time.Since(s.UltimaTroca).Round(time.Second).String())
+			troca = T("time_ago", duracaoResumida(time.Since(s.UltimaTroca)))
 		}
 		tabela.SetCell(linha, 4, tview.NewTableCell(troca).SetTextColor(tcell.ColorGray))
 
@@ -289,6 +289,22 @@ func (d *Dashboard) AtualizaRecursos() {
 		}
 		d.recursos.SetText(linhaCPU + "\n" + linhaRAM)
 	})
+}
+
+// duracaoResumida formata uma duração sem o nível de detalhe de segundos
+// quando já passou mais de um minuto. time.Duration.String() sempre inclui
+// segundos (ex: "5m0s"), o que fica poluído numa coluna que atualiza a
+// cada segundo.
+func duracaoResumida(d time.Duration) string {
+	d = d.Round(time.Second)
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	default:
+		return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
+	}
 }
 
 func barraBlocos(percentual float64, largura int) string {

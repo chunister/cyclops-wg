@@ -19,6 +19,7 @@ dist/
 # Configs WireGuard completas (contêm PrivateKey ao colar a chave)
 raw/
 
-# Controlador: binário compilado e o estado de cooldown dos servidores
+# Controlador: binário compilado, o estado de cooldown dos servidores e o log
 controller/controller
 controller/controller-state.json
+controller/controller.log

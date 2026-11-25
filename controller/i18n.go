@@ -117,6 +117,7 @@ var textos = map[idioma]map[string]string{
 		"log_status_server_listening":   "controller status at :%s/status",
 		"log_invalid_env_int":           "invalid value in %s=%q, using %d",
 		"log_invalid_env_bool":          "invalid value in %s=%q, using %v",
+		"log_file_open_failed":          "couldn't open the log file %s: %v",
 	},
 	idiomaPT: {
 		"panel_resources":               " recursos (host) ",
@@ -173,6 +174,7 @@ var textos = map[idioma]map[string]string{
 		"log_status_server_listening":   "status do controlador em :%s/status",
 		"log_invalid_env_int":           "valor inválido em %s=%q, usando %d",
 		"log_invalid_env_bool":          "valor inválido em %s=%q, usando %v",
+		"log_file_open_failed":          "não consegui abrir o arquivo de log %s: %v",
 	},
 	idiomaES: {
 		"panel_resources":               " recursos (host) ",
@@ -229,5 +231,6 @@ var textos = map[idioma]map[string]string{
 		"log_status_server_listening":   "estado del controlador en :%s/status",
 		"log_invalid_env_int":           "valor inválido en %s=%q, usando %d",
 		"log_invalid_env_bool":          "valor inválido en %s=%q, usando %v",
+		"log_file_open_failed":          "no pude abrir el archivo de log %s: %v",
 	},
 }
