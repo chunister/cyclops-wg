@@ -15,6 +15,7 @@ import (
 // do log cru. É montado só quando DASHBOARD está ligado.
 type Dashboard struct {
 	app             *tview.Application
+	pages           *tview.Pages
 	resumo          *tview.TextView
 	recursos        *tview.TextView
 	tabelasGateways *tview.Flex
@@ -36,6 +37,7 @@ type Dashboard struct {
 	amostraDeRedeQuando                time.Time
 
 	aoRenovar func()
+	aoSair    func(removerContainers bool)
 	pausado   bool
 }
 
@@ -78,11 +80,18 @@ func NovoDashboard() *Dashboard {
 		AddItem(d.conexoes, 0, 2, false).
 		AddItem(rodape, 0, 1, false)
 
-	d.app.SetRoot(layout, true)
+	d.pages = tview.NewPages().AddPage("main", layout, true, true)
+	d.app.SetRoot(d.pages, true)
 	d.app.SetInputCapture(func(evento *tcell.EventKey) *tcell.EventKey {
+		if d.pages.HasPage("sair") {
+			// Com o modal de confirmação aberto, deixa só ele tratar o
+			// teclado (setas/enter pra escolher o botão); nenhum atalho do
+			// dashboard roda por baixo enquanto a pergunta está na tela.
+			return evento
+		}
 		switch {
 		case evento.Rune() == 'q' || evento.Key() == tcell.KeyCtrlC:
-			d.app.Stop()
+			d.mostraConfirmacaoDeSaida()
 			return nil
 		case evento.Rune() == 'r':
 			if d.aoRenovar != nil {
@@ -127,6 +136,42 @@ func (d *Dashboard) aplicaIdioma() {
 // pra não travar a tela enquanto ela acontece.
 func (d *Dashboard) DefinirAoRenovar(f func()) {
 	d.aoRenovar = f
+}
+
+// DefinirAoSair registra a função chamada quando o usuário confirma a saída
+// pelo modal de "q". removerContainers indica se o usuário escolheu também
+// derrubar os containers (gateways + balanceador) ou só fechar a tela e
+// deixar tudo rodando. Quem chama roda isso de forma síncrona, antes de
+// parar o app: remover os containers pode levar alguns segundos.
+func (d *Dashboard) DefinirAoSair(f func(removerContainers bool)) {
+	d.aoSair = f
+}
+
+// mostraConfirmacaoDeSaida substitui a tela principal por um modal com três
+// opções, em vez de sair na hora: evita derrubar o proxy sem querer com um
+// "q" apertado por engano, já que os containers continuam valendo mesmo com
+// o dashboard fechado.
+func (d *Dashboard) mostraConfirmacaoDeSaida() {
+	modal := tview.NewModal().
+		SetText(T("confirm_quit_text")).
+		AddButtons([]string{T("confirm_quit_only"), T("confirm_quit_remove"), T("confirm_quit_cancel")}).
+		SetDoneFunc(func(indice int, rotulo string) {
+			switch indice {
+			case 0: // só sair
+				if d.aoSair != nil {
+					d.aoSair(false)
+				}
+				d.app.Stop()
+			case 1: // sair e remover os containers
+				if d.aoSair != nil {
+					d.aoSair(true)
+				}
+				d.app.Stop()
+			default: // cancelar
+				d.pages.RemovePage("sair")
+			}
+		})
+	d.pages.AddPage("sair", modal, true, true)
 }
 
 // Write faz o Dashboard servir de saída para o log padrão: cada linha

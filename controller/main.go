@@ -137,6 +137,24 @@ func main() {
 	}
 	log.SetOutput(io.MultiWriter(destinos...))
 	dash.DefinirAoRenovar(func() { go ctrl.rotacionaTodos(ctx) })
+	dash.DefinirAoSair(func(removerContainers bool) {
+		if !removerContainers {
+			return
+		}
+		// Roda síncrono, de propósito: o processo sai logo depois que esta
+		// função voltar (d.app.Stop() é chamado em seguida, dentro do
+		// próprio Dashboard), então a remoção precisa terminar antes disso.
+		// Escreve direto no stderr em vez de usar log.Print: esta função
+		// roda na goroutine do tview (callback do modal de confirmação), e
+		// log.Print iria parar no Write do Dashboard, que chama
+		// QueueUpdateDraw — travaria esperando a própria goroutine que o
+		// chamou ficar livre pra consumir o canal.
+		fmt.Fprintln(os.Stderr, T("log_removing_containers"))
+		ctrl.docker.RemoveSeExistir(ctx, "cyclops-balancer")
+		for _, s := range ctrl.CopiaSlots() {
+			ctrl.docker.RemoveSeExistir(ctx, s.Nome)
+		}
+	})
 
 	go func() {
 		ticker := time.NewTicker(time.Duration(cfg.HealthInterval) * time.Second)
