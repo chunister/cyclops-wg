@@ -26,6 +26,7 @@ type Dashboard struct {
 	tabelaReservas *tview.Table
 	conexoes       *tview.Table
 	eventos        *tview.TextView
+	atalhos        *tview.TextView
 
 	cpuAnterior    cpuAmostra
 	cpuTemAnterior bool
@@ -44,26 +45,38 @@ func NovoDashboard() *Dashboard {
 		tabelaReservas: tview.NewTable().SetBorders(false),
 		conexoes:       tview.NewTable().SetBorders(false),
 		eventos:        tview.NewTextView().SetDynamicColors(true).SetScrollable(true).SetMaxLines(500),
+		atalhos:        tview.NewTextView().SetDynamicColors(true),
 	}
 	d.eventos.SetChangedFunc(func() { d.eventos.ScrollToEnd() })
 
-	d.resumo.SetBorder(true).SetTitle(" cyclops-wg — atalhos: q sai · r renova todos os túneis · p pausa/retoma · c limpa eventos ")
+	d.resumo.SetBorder(true).SetTitle(" cyclops-wg ")
 	d.recursos.SetBorder(true).SetTitle(" recursos (host) ")
 	d.tabelaAtivos.SetBorder(true).SetTitle(" ativos ")
 	d.tabelaReservas.SetBorder(true).SetTitle(" reservas ")
 	d.conexoes.SetBorder(true).SetTitle(" conexões recentes ")
 	d.eventos.SetBorder(true).SetTitle(" eventos ")
+	d.atalhos.SetBorder(true).SetTitle(" atalhos ")
+	d.atalhos.SetText(
+		"[yellow]q[white]  sair\n" +
+			"[yellow]r[white]  renovar todos os túneis\n" +
+			"[yellow]p[white]  pausar/retomar a tela\n" +
+			"[yellow]c[white]  limpar eventos",
+	)
 
 	tabelasGateways := tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(d.tabelaAtivos, 0, 1, false).
 		AddItem(d.tabelaReservas, 0, 1, false)
+
+	rodape := tview.NewFlex().SetDirection(tview.FlexColumn).
+		AddItem(d.eventos, 0, 3, false).
+		AddItem(d.atalhos, 0, 1, false)
 
 	layout := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(d.resumo, 3, 0, false).
 		AddItem(d.recursos, 4, 0, false).
 		AddItem(tabelasGateways, 0, 2, false).
 		AddItem(d.conexoes, 0, 2, false).
-		AddItem(d.eventos, 0, 1, false)
+		AddItem(rodape, 0, 1, false)
 
 	d.app.SetRoot(layout, true)
 	d.app.SetInputCapture(func(evento *tcell.EventKey) *tcell.EventKey {
