@@ -17,9 +17,10 @@ type Dashboard struct {
 	app            *tview.Application
 	resumo         *tview.TextView
 	recursos       *tview.TextView
-	tabelaAtivos   *tview.Table
-	tabelaReservas *tview.Table
-	conexoes       *tview.Table
+	tabelasGateways *tview.Flex
+	tabelaAtivos    *tview.Table
+	tabelaReservas  *tview.Table
+	conexoes        *tview.Table
 	eventos        *tview.TextView
 	atalhos        *tview.TextView
 
@@ -58,11 +59,13 @@ func NovoDashboard() *Dashboard {
 	d.conexoes.SetBorder(true)
 	d.eventos.SetBorder(true)
 	d.atalhos.SetBorder(true)
-	d.aplicaIdioma()
 
-	tabelasGateways := tview.NewFlex().SetDirection(tview.FlexColumn).
+	d.tabelasGateways = tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(d.tabelaAtivos, 0, 1, false).
 		AddItem(d.tabelaReservas, 0, 1, false)
+	d.tabelasGateways.SetBorder(true)
+
+	d.aplicaIdioma()
 
 	rodape := tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(d.eventos, 0, 3, false).
@@ -71,7 +74,7 @@ func NovoDashboard() *Dashboard {
 	layout := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(d.resumo, 3, 0, false).
 		AddItem(d.recursos, 5, 0, false).
-		AddItem(tabelasGateways, 0, 2, false).
+		AddItem(d.tabelasGateways, 0, 2, false).
 		AddItem(d.conexoes, 0, 2, false).
 		AddItem(rodape, 0, 1, false)
 
@@ -110,6 +113,7 @@ func NovoDashboard() *Dashboard {
 // recalculados em toda atualização).
 func (d *Dashboard) aplicaIdioma() {
 	d.recursos.SetTitle(T("panel_resources"))
+	d.tabelasGateways.SetTitle(T("panel_gateways"))
 	d.tabelaAtivos.SetTitle(T("panel_active"))
 	d.tabelaReservas.SetTitle(T("panel_spare"))
 	d.conexoes.SetTitle(T("panel_connections"))

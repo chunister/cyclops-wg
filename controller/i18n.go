@@ -64,6 +64,7 @@ func T(chave string, args ...interface{}) string {
 var textos = map[idioma]map[string]string{
 	idiomaEN: {
 		"panel_resources":               " resources (host) ",
+		"panel_gateways":                " gateways ",
 		"panel_active":                  " active ",
 		"panel_spare":                   " spare ",
 		"panel_connections":             " recent connections ",
@@ -121,6 +122,7 @@ var textos = map[idioma]map[string]string{
 	},
 	idiomaPT: {
 		"panel_resources":               " recursos (host) ",
+		"panel_gateways":                " gateways ",
 		"panel_active":                  " ativos ",
 		"panel_spare":                   " reservas ",
 		"panel_connections":             " conexões recentes ",
@@ -178,6 +180,7 @@ var textos = map[idioma]map[string]string{
 	},
 	idiomaES: {
 		"panel_resources":               " recursos (host) ",
+		"panel_gateways":                " gateways ",
 		"panel_active":                  " activos ",
 		"panel_spare":                   " reserva ",
 		"panel_connections":             " conexiones recientes ",
