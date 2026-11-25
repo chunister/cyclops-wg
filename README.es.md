@@ -68,9 +68,10 @@ Para una próxima ronda: el balanceador podría ganar soporte para `UDP ASSOCIAT
 
 ## Requisitos del host
 
-- Kernel con el módulo WireGuard cargado (`sudo modprobe wireguard`).
-- Docker Engine 27 o más reciente, con Compose v2 (para la prueba rápida) y acceso al socket de Docker (para el controlador). Probado con Docker 27.5.1 en Kali.
-- Go, solo para compilar el controlador. El `go.mod` pide Go 1.26 (traído por el SDK de Docker); con `GOTOOLCHAIN=auto` (el valor por defecto desde Go 1.21), el propio `go build` descarga el toolchain correcto si el instalado es más viejo.
+- Kernel Linux con el módulo WireGuard cargado (`sudo modprobe wireguard`). El propio `wireguard-tools` (`wg`) solo se usa dentro del contenedor del gateway, instalado por su propio `Dockerfile` — no hace falta instalarlo en el host, pero la [página de instalación](https://www.wireguard.com/install/) está ahí si quieres probarlo fuera del proyecto. Probado en Kali GNU/Linux 2025.4, kernel `6.16.8+kali-amd64`.
+- [Docker Engine](https://docs.docker.com/engine/install/) 27 o más reciente, con Compose v2 (para la prueba rápida) y acceso al socket de Docker (para el controlador). Probado con Docker `27.5.1+dfsg4` y Docker Compose `v2.32.4-3`.
+- [Go](https://go.dev/doc/install), solo para compilar el controlador. El `go.mod` pide Go 1.26 (traído por el SDK de Docker); con `GOTOOLCHAIN=auto` (el valor por defecto desde Go 1.21), el propio `go build` descarga el toolchain correcto si el instalado es más viejo. Probado con `go1.26.3`.
+- Cuenta en [Surfshark](https://surfshark.com/), para generar la clave WireGuard usada en el `.env` (ver "Configuración" más abajo).
 
 ## Licencia
 
