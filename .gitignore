@@ -20,8 +20,10 @@ dist/
 raw/
 
 # Controlador: binário compilado, o estado de cooldown dos servidores, a
-# média de latência do catálogo e o log
+# média de latência do catálogo, as preferências do dashboard (idioma/tema)
+# e o log
 controller/controller
 controller/controller-state.json
 controller/latencia.json
+controller/dashboard-prefs.json
 controller/controller.log

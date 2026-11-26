@@ -129,7 +129,7 @@ func main() {
 	}
 
 	inicio := time.Now()
-	dash := NovoDashboard()
+	dash := NovoDashboard(cfg.PrefsFile)
 	destinos := []io.Writer{dash}
 	if arquivo, ok := abreArquivoDeLog(cfg.LogFile); ok {
 		defer arquivo.Close()

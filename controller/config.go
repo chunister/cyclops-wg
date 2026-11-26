@@ -36,6 +36,7 @@ type Config struct {
 	LatencyTopServers    int    // 0 desliga. Sorteia só entre os N servidores com menor ping médio.
 	LatencyCheckInterval int    // segundos entre re-pings do catálogo inteiro
 	LatencyFile          string
+	PrefsFile            string // "" desliga: idioma/tema do dashboard não são salvos entre execuções
 }
 
 // diretorioExecutavel devolve a pasta onde o binário compilado do
@@ -99,6 +100,7 @@ func carregaConfig() Config {
 		LatencyTopServers:    envInt("LATENCY_TOP_SERVERS", 0),
 		LatencyCheckInterval: envInt("LATENCY_CHECK_INTERVAL", 600),
 		LatencyFile:          resolveRelativo(exeDir, env("LATENCY_FILE", "./latencia.json")),
+		PrefsFile:            resolveRelativo(exeDir, env("PREFS_FILE", "./dashboard-prefs.json")),
 	}
 }
 

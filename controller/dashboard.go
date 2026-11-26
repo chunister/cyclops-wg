@@ -36,7 +36,8 @@ type Dashboard struct {
 	temAmostraDeRede                   bool
 	amostraDeRedeQuando                time.Time
 
-	temaIndice int
+	temaIndice   int
+	arquivoPrefs string
 
 	aoRenovar func()
 	aoSair    func(removerContainers bool)
@@ -48,7 +49,10 @@ func (d *Dashboard) tema() Tema {
 	return temas[d.temaIndice]
 }
 
-func NovoDashboard() *Dashboard {
+// NovoDashboard monta o dashboard e já carrega idioma/tema salvos em
+// arquivoPrefs (da execução anterior), se houver. "" desliga a persistência:
+// cada execução parte sempre do idioma do DASH_LANG e do tema padrão.
+func NovoDashboard(arquivoPrefs string) *Dashboard {
 	d := &Dashboard{
 		app:            tview.NewApplication(),
 		resumo:         tview.NewTextView().SetDynamicColors(true),
@@ -74,6 +78,15 @@ func NovoDashboard() *Dashboard {
 		AddItem(d.tabelaReservas, 0, 1, false)
 	d.tabelasGateways.SetBorder(true)
 
+	d.arquivoPrefs = arquivoPrefs
+	prefs := carregaPreferencias(arquivoPrefs)
+	if prefs.Idioma != "" {
+		DefineIdioma(idiomaDeString(prefs.Idioma))
+	}
+	if indice, ok := indiceDoTema(prefs.Tema); ok {
+		d.temaIndice = indice
+	}
+
 	d.aplicaIdioma()
 
 	rodape := tview.NewFlex().SetDirection(tview.FlexColumn).
@@ -91,8 +104,8 @@ func NovoDashboard() *Dashboard {
 	d.app.SetRoot(d.pages, true)
 	d.aplicaTema()
 	d.app.SetInputCapture(func(evento *tcell.EventKey) *tcell.EventKey {
-		if d.pages.HasPage("sair") {
-			// Com o modal de confirmação aberto, deixa só ele tratar o
+		if frente, _ := d.pages.GetFrontPage(); frente != "main" {
+			// Com algum modal de confirmação aberto, deixa só ele tratar o
 			// teclado (setas/enter pra escolher o botão); nenhum atalho do
 			// dashboard roda por baixo enquanto a pergunta está na tela.
 			return evento
@@ -102,9 +115,7 @@ func NovoDashboard() *Dashboard {
 			d.mostraConfirmacaoDeSaida()
 			return nil
 		case evento.Rune() == 'r':
-			if d.aoRenovar != nil {
-				d.aoRenovar()
-			}
+			d.mostraConfirmacaoDeRenovar()
 			return nil
 		case evento.Rune() == 'p':
 			d.pausado = !d.pausado
@@ -115,18 +126,22 @@ func NovoDashboard() *Dashboard {
 		case evento.Rune() == 'l':
 			ProximoIdioma()
 			d.aplicaIdioma()
+			d.salvaPreferencias()
 			return nil
 		case evento.Rune() == 'L':
 			AnteriorIdioma()
 			d.aplicaIdioma()
+			d.salvaPreferencias()
 			return nil
 		case evento.Rune() == 't':
 			d.temaIndice = (d.temaIndice + 1) % len(temas)
 			d.aplicaTema()
+			d.salvaPreferencias()
 			return nil
 		case evento.Rune() == 'T':
 			d.temaIndice = (d.temaIndice - 1 + len(temas)) % len(temas)
 			d.aplicaTema()
+			d.salvaPreferencias()
 			return nil
 		}
 		return evento
@@ -208,6 +223,20 @@ func (d *Dashboard) aplicaTema() {
 	d.redesenhaAtalhos()
 }
 
+// salvaPreferencias grava o idioma e o tema atuais em arquivoPrefs, pra
+// próxima execução já abrir no mesmo estado. Chamada depois de qualquer
+// troca pelos atalhos l/L/t/T. Sem arquivoPrefs configurado (PREFS_FILE
+// vazio), não faz nada.
+func (d *Dashboard) salvaPreferencias() {
+	if d.arquivoPrefs == "" {
+		return
+	}
+	preferenciasDashboard{
+		Idioma: idiomaParaString(IdiomaAtual()),
+		Tema:   temas[d.temaIndice].Nome,
+	}.salva(d.arquivoPrefs)
+}
+
 // DefinirAoRenovar registra a função chamada quando o usuário aperta "r".
 // Quem chama é responsável por rodar em segundo plano (a rotação demora),
 // pra não travar a tela enquanto ela acontece.
@@ -254,6 +283,29 @@ func (d *Dashboard) mostraConfirmacaoDeSaida() {
 			}
 		})
 	d.pages.AddPage("sair", modal, true, true)
+}
+
+// mostraConfirmacaoDeRenovar pergunta antes de disparar a rotação completa:
+// troca o servidor de todos os gateways de uma vez, até os que não
+// falharam, então vale confirmar em vez de disparar sozinho num "r"
+// apertado sem querer. "Não" vem focado por padrão (SetFocus(1)).
+func (d *Dashboard) mostraConfirmacaoDeRenovar() {
+	t := d.tema()
+	modal := tview.NewModal().
+		SetText(T("confirm_renew_text")).
+		SetBackgroundColor(t.Fundo).
+		SetTextColor(t.Texto).
+		SetButtonBackgroundColor(t.Apagado).
+		SetButtonTextColor(t.Branco).
+		AddButtons([]string{T("confirm_renew_yes"), T("confirm_renew_no")}).
+		SetFocus(1).
+		SetDoneFunc(func(indice int, rotulo string) {
+			if indice == 0 && d.aoRenovar != nil {
+				d.aoRenovar()
+			}
+			d.pages.RemovePage("renovar")
+		})
+	d.pages.AddPage("renovar", modal, true, true)
 }
 
 // Write faz o Dashboard servir de saída para o log padrão: cada linha
