@@ -46,6 +46,26 @@ func ProximoIdioma() idioma {
 	return novo
 }
 
+// AnteriorIdioma anda o ciclo no sentido contrário (en -> es -> pt-br -> en),
+// usado pelo atalho "L" (shift+l) do dashboard.
+func AnteriorIdioma() idioma {
+	novo := (IdiomaAtual() - 1 + 3) % 3
+	DefineIdioma(novo)
+	return novo
+}
+
+// nomeIdioma devolve um rótulo curto, pro canto do resumo do dashboard.
+func nomeIdioma(i idioma) string {
+	switch i {
+	case idiomaPT:
+		return "PT-BR"
+	case idiomaES:
+		return "ES"
+	default:
+		return "EN"
+	}
+}
+
 // T busca o texto de chave no idioma ativo e formata com args, como
 // fmt.Sprintf. Cai pro inglês se a chave não existir no idioma ativo.
 func T(chave string, args ...interface{}) string {
@@ -70,7 +90,12 @@ var textos = map[idioma]map[string]string{
 		"panel_connections":             " recent connections ",
 		"panel_events":                  " events ",
 		"panel_shortcuts":               " shortcuts ",
-		"shortcuts_text":                "[yellow]q[white]  quit\n[yellow]r[white]  renew all tunnels\n[yellow]p[white]  pause/resume screen\n[yellow]c[white]  clear events\n[yellow]l[white]  change language",
+		"shortcut_quit":                 "quit",
+		"shortcut_renew":                "renew all tunnels",
+		"shortcut_pause":                "pause/resume screen",
+		"shortcut_clear":                "clear events",
+		"shortcut_language":             "change language",
+		"shortcut_theme":                "change theme",
 		"confirm_quit_text":             "Quit the dashboard?",
 		"confirm_quit_only":             "Just quit (keep containers running)",
 		"confirm_quit_remove":           "Quit and remove all containers",
@@ -137,7 +162,12 @@ var textos = map[idioma]map[string]string{
 		"panel_connections":             " conexões recentes ",
 		"panel_events":                  " eventos ",
 		"panel_shortcuts":               " atalhos ",
-		"shortcuts_text":                "[yellow]q[white]  sair\n[yellow]r[white]  renovar todos os túneis\n[yellow]p[white]  pausar/retomar a tela\n[yellow]c[white]  limpar eventos\n[yellow]l[white]  mudar idioma",
+		"shortcut_quit":                 "sair",
+		"shortcut_renew":                "renovar todos os túneis",
+		"shortcut_pause":                "pausar/retomar a tela",
+		"shortcut_clear":                "limpar eventos",
+		"shortcut_language":             "mudar idioma",
+		"shortcut_theme":                "mudar tema",
 		"confirm_quit_text":             "Sair do dashboard?",
 		"confirm_quit_only":             "Só sair (deixar os containers rodando)",
 		"confirm_quit_remove":           "Sair e remover todos os containers",
@@ -204,7 +234,12 @@ var textos = map[idioma]map[string]string{
 		"panel_connections":             " conexiones recientes ",
 		"panel_events":                  " eventos ",
 		"panel_shortcuts":               " atajos ",
-		"shortcuts_text":                "[yellow]q[white]  salir\n[yellow]r[white]  renovar todos los túneles\n[yellow]p[white]  pausar/reanudar la pantalla\n[yellow]c[white]  limpiar eventos\n[yellow]l[white]  cambiar idioma",
+		"shortcut_quit":                 "salir",
+		"shortcut_renew":                "renovar todos los túneles",
+		"shortcut_pause":                "pausar/reanudar la pantalla",
+		"shortcut_clear":                "limpiar eventos",
+		"shortcut_language":             "cambiar idioma",
+		"shortcut_theme":                "cambiar tema",
 		"confirm_quit_text":             "¿Salir del dashboard?",
 		"confirm_quit_only":             "Solo salir (dejar los containers corriendo)",
 		"confirm_quit_remove":           "Salir y eliminar todos los containers",

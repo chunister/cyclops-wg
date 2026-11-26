@@ -36,9 +36,16 @@ type Dashboard struct {
 	temAmostraDeRede                   bool
 	amostraDeRedeQuando                time.Time
 
+	temaIndice int
+
 	aoRenovar func()
 	aoSair    func(removerContainers bool)
 	pausado   bool
+}
+
+// tema devolve a paleta ativa no momento.
+func (d *Dashboard) tema() Tema {
+	return temas[d.temaIndice]
 }
 
 func NovoDashboard() *Dashboard {
@@ -68,6 +75,7 @@ func NovoDashboard() *Dashboard {
 	d.tabelasGateways.SetBorder(true)
 
 	d.aplicaIdioma()
+	d.aplicaTema()
 
 	rodape := tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(d.eventos, 0, 3, false).
@@ -108,6 +116,18 @@ func NovoDashboard() *Dashboard {
 			ProximoIdioma()
 			d.aplicaIdioma()
 			return nil
+		case evento.Rune() == 'L':
+			AnteriorIdioma()
+			d.aplicaIdioma()
+			return nil
+		case evento.Rune() == 't':
+			d.temaIndice = (d.temaIndice + 1) % len(temas)
+			d.aplicaTema()
+			return nil
+		case evento.Rune() == 'T':
+			d.temaIndice = (d.temaIndice - 1 + len(temas)) % len(temas)
+			d.aplicaTema()
+			return nil
 		}
 		return evento
 	})
@@ -128,7 +148,64 @@ func (d *Dashboard) aplicaIdioma() {
 	d.conexoes.SetTitle(T("panel_connections"))
 	d.eventos.SetTitle(T("panel_events"))
 	d.atalhos.SetTitle(T("panel_shortcuts"))
-	d.atalhos.SetText(T("shortcuts_text"))
+	d.redesenhaAtalhos()
+}
+
+// redesenhaAtalhos monta o texto do painel de atalhos: a tecla na cor de
+// cabeçalho do tema, a descrição na cor de texto normal. Separado da
+// tradução (shortcut_*) porque a cor depende do tema, não do idioma — e os
+// dois podem mudar em momentos diferentes.
+func (d *Dashboard) redesenhaAtalhos() {
+	t := d.tema()
+	corChave := fmt.Sprintf("#%06x", t.Cabecalho.Hex())
+	corDesc := fmt.Sprintf("#%06x", t.Texto.Hex())
+	linha := func(tecla, chave string) string {
+		return fmt.Sprintf("[%s]%s[%s]  %s", corChave, tecla, corDesc, T(chave))
+	}
+	d.atalhos.SetText(strings.Join([]string{
+		linha("q", "shortcut_quit"),
+		linha("r", "shortcut_renew"),
+		linha("p", "shortcut_pause"),
+		linha("c", "shortcut_clear"),
+		linha("l/L", "shortcut_language"),
+		linha("t/T", "shortcut_theme"),
+	}, "\n"))
+}
+
+// caixaTematizavel é o conjunto de setters de cor que tview promove de Box
+// pra qualquer widget que o embute (TextView, Table, Flex), usado aqui só
+// pra poder repetir a aplicação de cor num slice em vez de uma linha por
+// painel.
+type caixaTematizavel interface {
+	SetBackgroundColor(tcell.Color) *tview.Box
+	SetBorderColor(tcell.Color) *tview.Box
+	SetTitleColor(tcell.Color) *tview.Box
+}
+
+// aplicaTema redesenha fundo, borda e título de cada painel na paleta
+// ativa, e atualiza os defaults globais do tview (Styles) usados por
+// qualquer célula de tabela nova (preencheTabelaGateways/AtualizaConexoes
+// recriam todas as células a cada atualização, então pegam a cor nova no
+// próximo ciclo automaticamente). Chamada na montagem do dashboard e de
+// novo toda vez que o atalho "t"/"T" troca o tema.
+func (d *Dashboard) aplicaTema() {
+	t := d.tema()
+
+	tview.Styles.PrimitiveBackgroundColor = t.Fundo
+	tview.Styles.ContrastBackgroundColor = t.Fundo
+	tview.Styles.PrimaryTextColor = t.Texto
+	tview.Styles.BorderColor = t.Apagado
+	tview.Styles.TitleColor = t.Branco
+	tview.Styles.GraphicsColor = t.Apagado
+
+	d.pages.SetBackgroundColor(t.Fundo)
+	for _, caixa := range []caixaTematizavel{
+		d.resumo, d.recursos, d.tabelasGateways, d.tabelaAtivos,
+		d.tabelaReservas, d.conexoes, d.eventos, d.atalhos,
+	} {
+		caixa.SetBackgroundColor(t.Fundo).SetBorderColor(t.Apagado).SetTitleColor(t.Branco)
+	}
+	d.redesenhaAtalhos()
 }
 
 // DefinirAoRenovar registra a função chamada quando o usuário aperta "r".
@@ -152,8 +229,13 @@ func (d *Dashboard) DefinirAoSair(f func(removerContainers bool)) {
 // "q" apertado por engano, já que os containers continuam valendo mesmo com
 // o dashboard fechado.
 func (d *Dashboard) mostraConfirmacaoDeSaida() {
+	t := d.tema()
 	modal := tview.NewModal().
 		SetText(T("confirm_quit_text")).
+		SetBackgroundColor(t.Fundo).
+		SetTextColor(t.Texto).
+		SetButtonBackgroundColor(t.Apagado).
+		SetButtonTextColor(t.Branco).
 		AddButtons([]string{T("confirm_quit_only"), T("confirm_quit_remove"), T("confirm_quit_cancel")}).
 		SetDoneFunc(func(indice int, rotulo string) {
 			switch indice {
@@ -212,20 +294,40 @@ func (d *Dashboard) Atualiza(inicio time.Time, slots []*Slot) {
 		if d.pausado {
 			pausa = T("paused_suffix")
 		}
-		d.resumo.SetText(T("summary_line", ativosOk, len(ativos), reservaOk, len(reservas), uptime, pausa))
+		linhaResumo := T("summary_line", ativosOk, len(ativos), reservaOk, len(reservas), uptime, pausa)
+		d.resumo.SetText(linhaResumo + d.rotuloTemaIdioma(linhaResumo))
 
 		if d.pausado {
 			return
 		}
-		preencheTabelaGateways(d.tabelaAtivos, ativos)
-		preencheTabelaGateways(d.tabelaReservas, reservas)
+		tema := d.tema()
+		preencheTabelaGateways(d.tabelaAtivos, ativos, tema)
+		preencheTabelaGateways(d.tabelaReservas, reservas, tema)
 	})
+}
+
+// rotuloTemaIdioma monta "tema · idioma" pra mostrar no canto direito da
+// primeira linha do resumo, preenchido com espaços a partir da largura real
+// do painel (GetInnerRect) pra ficar encostado na borda direita. Antes do
+// primeiro desenho a largura ainda pode vir zerada; nesse caso só um espaço
+// separa o texto, e o alinhamento se acerta sozinho no próximo ciclo.
+func (d *Dashboard) rotuloTemaIdioma(linhaEsquerda string) string {
+	t := d.tema()
+	rotulo := fmt.Sprintf("[#%06x]%s · %s[-]", t.Apagado.Hex(), t.Nome, nomeIdioma(IdiomaAtual()))
+	tamanhoVisivel := len(t.Nome) + 3 + len(nomeIdioma(IdiomaAtual()))
+
+	_, _, largura, _ := d.resumo.GetInnerRect()
+	preenchimento := largura - len(linhaEsquerda) - tamanhoVisivel
+	if preenchimento < 1 {
+		preenchimento = 1
+	}
+	return strings.Repeat(" ", preenchimento) + rotulo
 }
 
 // preencheTabelaGateways redesenha uma das duas tabelas de gateway (ativos
 // ou reservas). O papel não precisa de coluna própria: já está no título
 // de qual das duas tabelas é essa.
-func preencheTabelaGateways(tabela *tview.Table, slots []*Slot) {
+func preencheTabelaGateways(tabela *tview.Table, slots []*Slot, tema Tema) {
 	tabela.Clear()
 	cabecalho := []string{
 		T("col_gateway"), T("col_server"), T("col_internal_ip"), T("col_exit_ip"),
@@ -233,46 +335,46 @@ func preencheTabelaGateways(tabela *tview.Table, slots []*Slot) {
 	}
 	for col, titulo := range cabecalho {
 		tabela.SetCell(0, col, tview.NewTableCell(titulo).
-			SetTextColor(tcell.ColorYellow).
+			SetTextColor(tema.Cabecalho).
 			SetSelectable(false))
 	}
 
 	for i, s := range slots {
-		estado, cor := T("state_healthy"), tcell.ColorGreen
+		estado, cor := T("state_healthy"), tema.Saudavel
 		switch {
 		case s.EmReparo:
-			estado, cor = T("state_repairing"), tcell.ColorYellow
+			estado, cor = T("state_repairing"), tema.Degradado
 		case s.Falhas > 0:
-			estado, cor = T("state_failing"), tcell.ColorRed
+			estado, cor = T("state_failing"), tema.Falhando
 		case s.PingMs >= limiarPingRuimMs:
 			// Conexão ok (sem falhas), mas lenta o bastante pra avisar sem
 			// tirar o gateway da rotação — isso quem decide é o HEALTH_FAILS.
-			estado, cor = T("state_degraded"), tcell.ColorYellow
+			estado, cor = T("state_degraded"), tema.Degradado
 		}
 		linha := i + 1
-		tabela.SetCell(linha, 0, tview.NewTableCell(s.Nome))
-		tabela.SetCell(linha, 1, tview.NewTableCell(s.Servidor))
-		tabela.SetCell(linha, 2, tview.NewTableCell(s.IP))
+		tabela.SetCell(linha, 0, tview.NewTableCell(s.Nome).SetTextColor(tema.Texto))
+		tabela.SetCell(linha, 1, tview.NewTableCell(s.Servidor).SetTextColor(tema.Texto))
+		tabela.SetCell(linha, 2, tview.NewTableCell(s.IP).SetTextColor(tema.Texto))
 
 		ipSaida := s.IPSaida
 		if ipSaida == "" {
 			ipSaida = "..."
 		}
-		tabela.SetCell(linha, 3, tview.NewTableCell(ipSaida).SetTextColor(tcell.ColorAqua))
+		tabela.SetCell(linha, 3, tview.NewTableCell(ipSaida).SetTextColor(tema.Destaque))
 
 		ping := "-"
 		if s.PingMs > 0 {
 			ping = fmt.Sprintf("%dms", s.PingMs)
 		}
-		tabela.SetCell(linha, 4, tview.NewTableCell(ping).SetTextColor(corPing(s.PingMs)))
+		tabela.SetCell(linha, 4, tview.NewTableCell(ping).SetTextColor(corPing(s.PingMs, tema)))
 
 		troca := "-"
 		if !s.UltimaTroca.IsZero() {
 			troca = T("time_ago", duracaoResumida(time.Since(s.UltimaTroca)))
 		}
-		tabela.SetCell(linha, 5, tview.NewTableCell(troca).SetTextColor(tcell.ColorGray))
+		tabela.SetCell(linha, 5, tview.NewTableCell(troca).SetTextColor(tema.Apagado))
 
-		tabela.SetCell(linha, 6, tview.NewTableCell(fmt.Sprintf("%d", s.Falhas)))
+		tabela.SetCell(linha, 6, tview.NewTableCell(fmt.Sprintf("%d", s.Falhas)).SetTextColor(tema.Texto))
 		tabela.SetCell(linha, 7, tview.NewTableCell(estado).SetTextColor(cor))
 	}
 }
@@ -290,16 +392,16 @@ const (
 // corPing escolhe a cor da coluna de ping pelo mesmo princípio da coluna de
 // estado: um jeito de bater o olho e já saber se tá bom, no limite ou ruim,
 // sem precisar comparar números.
-func corPing(ms int64) tcell.Color {
+func corPing(ms int64, tema Tema) tcell.Color {
 	switch {
 	case ms <= 0:
-		return tcell.ColorGray
+		return tema.Apagado
 	case ms < limiarPingBomMs:
-		return tcell.ColorGreen
+		return tema.Saudavel
 	case ms < limiarPingRuimMs:
-		return tcell.ColorYellow
+		return tema.Degradado
 	default:
-		return tcell.ColorRed
+		return tema.Falhando
 	}
 }
 
@@ -311,23 +413,24 @@ func (d *Dashboard) AtualizaConexoes(conexoes []Conexao, ipSaida map[string]stri
 		if d.pausado {
 			return
 		}
+		tema := d.tema()
 		d.conexoes.Clear()
 		cabecalho := []string{T("col_time"), T("col_source"), T("col_destination"), T("col_gateway"), T("col_exit_ip")}
 		for col, titulo := range cabecalho {
 			d.conexoes.SetCell(0, col, tview.NewTableCell(titulo).
-				SetTextColor(tcell.ColorYellow).
+				SetTextColor(tema.Cabecalho).
 				SetSelectable(false))
 		}
 		for i, c := range conexoes {
 			linha := i + 1
 			d.conexoes.SetCell(linha, 0, tview.NewTableCell(c.Quando.Format("15:04:05")).
-				SetTextColor(tcell.ColorGray))
+				SetTextColor(tema.Apagado))
 			d.conexoes.SetCell(linha, 1, tview.NewTableCell(c.Origem).
-				SetTextColor(tcell.ColorWhite))
+				SetTextColor(tema.Branco))
 			d.conexoes.SetCell(linha, 2, tview.NewTableCell(c.Destino).
-				SetTextColor(tcell.ColorOrange))
+				SetTextColor(tema.Alerta))
 			d.conexoes.SetCell(linha, 3, tview.NewTableCell(c.Gateway).
-				SetTextColor(tcell.ColorAqua))
+				SetTextColor(tema.Destaque))
 
 			saida := "..."
 			if host, _, err := net.SplitHostPort(c.Gateway); err == nil {
@@ -336,7 +439,7 @@ func (d *Dashboard) AtualizaConexoes(conexoes []Conexao, ipSaida map[string]stri
 				}
 			}
 			d.conexoes.SetCell(linha, 4, tview.NewTableCell(saida).
-				SetTextColor(tcell.ColorAqua))
+				SetTextColor(tema.Destaque))
 		}
 	})
 }
