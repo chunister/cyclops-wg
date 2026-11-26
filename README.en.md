@@ -10,6 +10,15 @@ A single SOCKS5 entry point spreads connections across several containers. Each 
 
 The idea comes from [tatu-rotate](https://github.com/marciosouza20/tatu-rotate), which uses Surfshark OpenVPN with Privoxy and Mubeng. This project changes the architecture: it uses WireGuard, native SOCKS5, and runtime control.
 
+## 📋 Host requirements
+
+On Debian 13, current Kali GNU/Linux, or Ubuntu, `sudo scripts/install-deps.sh` installs all of this at once (Docker, Compose v2, Go, and the WireGuard module). On another distro, or if you'd rather install by hand, here's the list:
+
+- A Linux kernel with the WireGuard module loaded (`sudo modprobe wireguard`). `wireguard-tools` (`wg`) itself is only used inside the gateway container, installed by its own `Dockerfile`. No need to install it on the host, but the [install page](https://www.wireguard.com/install/) is there if you want to try it outside the project. Tested on Kali GNU/Linux 2025.4, kernel `6.16.8+kali-amd64`.
+- [Docker Engine](https://docs.docker.com/engine/install/) 27 or newer, with Compose v2 (for the quick test) and access to the Docker socket (for the controller). Tested with Docker `27.5.1+dfsg4` and Docker Compose `v2.32.4-3`.
+- [Go](https://go.dev/doc/install), just to build the controller. The `go.mod` asks for Go 1.26 (pulled in by the Docker SDK); with `GOTOOLCHAIN=auto` (the Go 1.21+ default), `go build` itself downloads the right toolchain if the installed one is older. Tested with `go1.26.3`.
+- A [Surfshark](https://surfshark.com/) account, to generate the WireGuard key used in `.env` (see "Setup" below). To sign up with a referral bonus, use [this link](https://surfshark.club/friend/adjVkuXB) ("You got a gift from a friend").
+
 ## ✅ Status
 
 Tested end to end on a Kali box and on a Debian 13 box: a real WireGuard tunnel, the SOCKS5 balancer working with curl and with Burp, server switching without stopping the container, and the controller bringing up the full set (10 active gateways plus 3 spares) against a real Docker daemon. Automatic promotion was also tested by killing an active gateway on purpose:
@@ -71,15 +80,6 @@ Tested on [ipleak.net](https://ipleak.net): the HTTP exit IP and DNS both showed
 Mitigation available today: disable WebRTC in the browser you use with cyclops-wg. Chromium has no native toggle for this; it works with an extension that blocks WebRTC, or by switching to a browser that allows disabling it through a setting, such as Firefox (`about:config`, `media.peerconnection.enabled = false`).
 
 For a future round: the balancer could gain `UDP ASSOCIATE` support, or the host could block outbound UDP outside the tunnel with a firewall rule, to drop WebRTC instead of letting it leak.
-
-## 📋 Host requirements
-
-On Debian 13, current Kali GNU/Linux, or Ubuntu, `sudo scripts/install-deps.sh` installs all of this at once (Docker, Compose v2, Go, and the WireGuard module). On another distro, or if you'd rather install by hand, here's the list:
-
-- A Linux kernel with the WireGuard module loaded (`sudo modprobe wireguard`). `wireguard-tools` (`wg`) itself is only used inside the gateway container, installed by its own `Dockerfile`. No need to install it on the host, but the [install page](https://www.wireguard.com/install/) is there if you want to try it outside the project. Tested on Kali GNU/Linux 2025.4, kernel `6.16.8+kali-amd64`.
-- [Docker Engine](https://docs.docker.com/engine/install/) 27 or newer, with Compose v2 (for the quick test) and access to the Docker socket (for the controller). Tested with Docker `27.5.1+dfsg4` and Docker Compose `v2.32.4-3`.
-- [Go](https://go.dev/doc/install), just to build the controller. The `go.mod` asks for Go 1.26 (pulled in by the Docker SDK); with `GOTOOLCHAIN=auto` (the Go 1.21+ default), `go build` itself downloads the right toolchain if the installed one is older. Tested with `go1.26.3`.
-- A [Surfshark](https://surfshark.com/) account, to generate the WireGuard key used in `.env` (see "Setup" below). To sign up with a referral bonus, use [this link](https://surfshark.club/friend/adjVkuXB) ("You got a gift from a friend").
 
 ## 📄 License
 
