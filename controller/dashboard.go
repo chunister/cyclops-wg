@@ -75,7 +75,6 @@ func NovoDashboard() *Dashboard {
 	d.tabelasGateways.SetBorder(true)
 
 	d.aplicaIdioma()
-	d.aplicaTema()
 
 	rodape := tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(d.eventos, 0, 3, false).
@@ -90,6 +89,7 @@ func NovoDashboard() *Dashboard {
 
 	d.pages = tview.NewPages().AddPage("main", layout, true, true)
 	d.app.SetRoot(d.pages, true)
+	d.aplicaTema()
 	d.app.SetInputCapture(func(evento *tcell.EventKey) *tcell.EventKey {
 		if d.pages.HasPage("sair") {
 			// Com o modal de confirmação aberto, deixa só ele tratar o
