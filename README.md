@@ -64,7 +64,7 @@ Testado em [ipleak.net](https://ipleak.net): o IP de saída HTTP e o DNS mostrar
 
 Mitigação disponível hoje: desative o WebRTC no navegador que for usar com o cyclops-wg. No Chromium não existe um botão nativo para isso; funciona com uma extensão que bloqueia WebRTC, ou trocando para um navegador que permita desativar por configuração, como o Firefox (`about:config`, `media.peerconnection.enabled = false`).
 
-Para uma próxima rodada: o balanceador pode ganhar suporte a `UDP ASSOCIATE`, ou o host pode bloquear UDP de saída fora do túnel por regra de firewall, para derrubar o WebRTC em vez de deixá-lo vazar.
+Para uma próxima rodada: o balanceador pode ganhar suporte a `UDP ASSOCIATE`, ou o host pode bloquear UDP de saída fora do túnel por regra de firewall, para derrubar o WebRTC em vez de deixá-lo vazar. O controlador também poderia migrar de `github.com/docker/docker` (descontinuado desde o Docker Engine v29, nov/2025) pro novo `github.com/moby/moby/client` — sem urgência, já que a negociação de versão da API já garante compatibilidade com dockers novos hoje, mas esse módulo antigo não recebe mais correção.
 
 ## Requisitos no host
 

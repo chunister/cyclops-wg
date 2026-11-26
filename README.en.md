@@ -64,7 +64,7 @@ Tested on [ipleak.net](https://ipleak.net): the HTTP exit IP and DNS both showed
 
 Mitigation available today: disable WebRTC in the browser you use with cyclops-wg. Chromium has no native toggle for this; it works with an extension that blocks WebRTC, or by switching to a browser that allows disabling it through a setting, such as Firefox (`about:config`, `media.peerconnection.enabled = false`).
 
-For a future round: the balancer could gain `UDP ASSOCIATE` support, or the host could block outbound UDP outside the tunnel with a firewall rule, to drop WebRTC instead of letting it leak.
+For a future round: the balancer could gain `UDP ASSOCIATE` support, or the host could block outbound UDP outside the tunnel with a firewall rule, to drop WebRTC instead of letting it leak. The controller could also migrate from `github.com/docker/docker` (deprecated since Docker Engine v29, Nov 2025) to the new `github.com/moby/moby/client` — not urgent, since API version negotiation already keeps it compatible with newer Docker installs today, but that old module no longer gets fixes.
 
 ## Host requirements
 

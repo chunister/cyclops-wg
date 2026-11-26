@@ -29,6 +29,17 @@ type Docker struct {
 	cfg Config
 }
 
+// NovoDocker abre o cliente da API do Docker usado por todo o resto deste
+// arquivo.
+//
+// TODO (sem pressa): github.com/docker/docker — o módulo Go importado aqui —
+// foi descontinuado a partir do Docker Engine v29 (nov/2025); o cliente
+// oficial agora é github.com/moby/moby/client (+ github.com/moby/moby/api
+// pros tipos). Hoje isso não quebra nada: WithAPIVersionNegotiation() abaixo
+// já negocia a versão com o daemon instalado, então continua falando com
+// dockers novos (v29+) numa boa. O risco é só esse pacote específico não
+// receber mais correção de bug/segurança daqui pra frente. Migrar não é
+// urgente, mas vale fazer antes de depender de algum recurso novo da API.
 func NovoDocker(cfg Config) (*Docker, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
