@@ -17,7 +17,7 @@ Em Debian 13, Kali GNU/Linux atual ou Ubuntu, `sudo scripts/install-deps.sh` ins
 - Kernel Linux com o módulo WireGuard carregado (`sudo modprobe wireguard`). O `wireguard-tools` (`wg`) em si só é usado dentro do container do gateway, instalado pelo próprio `Dockerfile`. Não precisa instalar no host, mas a [página de instalação](https://www.wireguard.com/install/) existe se quiser testar fora do projeto. Testado em Kali GNU/Linux 2025.4, kernel `6.16.8+kali-amd64`.
 - [Docker Engine](https://docs.docker.com/engine/install/) 27 ou mais recente, com Compose v2 (para o teste rápido) e acesso ao socket do Docker (para o controlador). Testado com Docker `27.5.1+dfsg4` e Docker Compose `v2.32.4-3`.
 - [Go](https://go.dev/doc/install), só para compilar o controlador. O `go.mod` pede Go 1.26 (puxado pelo SDK do Docker); com `GOTOOLCHAIN=auto` (padrão do Go 1.21+), o próprio `go build` baixa o toolchain certo se o instalado for mais antigo. Testado com `go1.26.3`.
-- Conta na [Surfshark](https://surfshark.com/), pra gerar a chave WireGuard usada no `.env` (veja "Configuração" abaixo). Pra criar a conta com um bônus de indicação, use [este link](https://surfshark.club/friend/adjVkuXB) ("You got a gift from a friend").
+- Conta na [Surfshark](https://surfshark.club/friend/adjVkuXB), pra gerar a chave WireGuard usada no `.env` (veja "Configuração" abaixo). Esse link ("You got a gift from a friend") dá um bônus de indicação na hora de criar a conta.
 
 ## ✅ Status
 
