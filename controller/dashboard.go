@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -338,8 +339,8 @@ func (d *Dashboard) Atualiza(inicio time.Time, slots []*Slot) {
 				}
 			}
 		}
-		sort.Slice(ativos, func(i, j int) bool { return ativos[i].Nome < ativos[j].Nome })
-		sort.Slice(reservas, func(i, j int) bool { return reservas[i].Nome < reservas[j].Nome })
+		sort.Slice(ativos, func(i, j int) bool { return numeroDoGateway(ativos[i].Nome) < numeroDoGateway(ativos[j].Nome) })
+		sort.Slice(reservas, func(i, j int) bool { return numeroDoGateway(reservas[i].Nome) < numeroDoGateway(reservas[j].Nome) })
 
 		uptime := time.Since(inicio).Round(time.Second)
 		pausa := ""
@@ -584,6 +585,19 @@ func formataTaxa(bytesPorSegundo float64) string {
 	default:
 		return fmt.Sprintf("%.0f B", bytesPorSegundo)
 	}
+}
+
+// numeroDoGateway extrai o número final do nome do container (ex:
+// "cyclops-gw-10" -> 10), pra ordenar as tabelas numericamente em vez de
+// alfabético — "cyclops-gw-10" < "cyclops-gw-2" como string, o que colocava
+// o 10 logo depois do 1 em vez de depois do 9.
+func numeroDoGateway(nome string) int {
+	partes := strings.Split(nome, "-")
+	n, err := strconv.Atoi(partes[len(partes)-1])
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // duracaoResumida formata uma duração sem o nível de detalhe de segundos
