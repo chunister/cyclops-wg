@@ -110,6 +110,25 @@ func (d *Docker) CriaGateway(ctx context.Context, nome, servidor string) error {
 	return d.cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
 }
 
+// socksBindings monta as publicações de porta do proxy SOCKS5 a partir de
+// cfg.SocksBindIP: "127.0.0.1" publica só no loopback, "0.0.0.0" publica em
+// todas as interfaces, e qualquer outra IP (uma interface de rede do host,
+// já validada em validaSocksBindIP) publica nela E no loopback, pra não
+// perder o acesso local só porque escolheu uma IP de rede específica.
+func socksBindings(cfg Config) []nat.PortBinding {
+	switch cfg.SocksBindIP {
+	case "127.0.0.1":
+		return []nat.PortBinding{{HostIP: "127.0.0.1", HostPort: cfg.SocksPort}}
+	case "0.0.0.0", "":
+		return []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: cfg.SocksPort}}
+	default:
+		return []nat.PortBinding{
+			{HostIP: "127.0.0.1", HostPort: cfg.SocksPort},
+			{HostIP: cfg.SocksBindIP, HostPort: cfg.SocksPort},
+		}
+	}
+}
+
 // CriaBalanceador sobe o balanceador na rede do projeto, publicando SOCKS_PORT e API_PORT no host.
 func (d *Docker) CriaBalanceador(ctx context.Context) error {
 	cfg := &container.Config{
@@ -130,7 +149,7 @@ func (d *Docker) CriaBalanceador(ctx context.Context) error {
 	}
 	hostCfg := &container.HostConfig{
 		PortBindings: nat.PortMap{
-			"1080/tcp": {{HostIP: "0.0.0.0", HostPort: d.cfg.SocksPort}},
+			"1080/tcp": socksBindings(d.cfg),
 			"8081/tcp": {{HostIP: "0.0.0.0", HostPort: d.cfg.ApiPort}},
 		},
 	}

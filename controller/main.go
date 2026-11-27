@@ -130,6 +130,7 @@ func main() {
 
 	inicio := time.Now()
 	dash := NovoDashboard(cfg.PrefsFile)
+	dash.DefinirEnderecoEscuta(cfg.SocksBindIP, cfg.SocksPort)
 	destinos := []io.Writer{dash}
 	if arquivo, ok := abreArquivoDeLog(cfg.LogFile); ok {
 		defer arquivo.Close()

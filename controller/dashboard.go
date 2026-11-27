@@ -17,6 +17,7 @@ import (
 type Dashboard struct {
 	app             *tview.Application
 	pages           *tview.Pages
+	layout          *tview.Flex
 	resumo          *tview.TextView
 	recursos        *tview.TextView
 	tabelasGateways *tview.Flex
@@ -37,6 +38,8 @@ type Dashboard struct {
 	temAmostraDeRede                   bool
 	amostraDeRedeQuando                time.Time
 
+	linhasEscuta []linhaEscuta
+
 	temaIndice   int
 	arquivoPrefs string
 
@@ -48,6 +51,70 @@ type Dashboard struct {
 // tema devolve a paleta ativa no momento.
 func (d *Dashboard) tema() Tema {
 	return temas[d.temaIndice]
+}
+
+// linhaEscuta é um endereço onde o proxy SOCKS5 está acessível, junto da
+// chave i18n do rótulo que explica esse endereço (local, rede interna, ou
+// todas as interfaces). O texto traduzido só é resolvido na hora de
+// desenhar (textoEnderecosEscuta), pra acompanhar trocas de idioma em tempo
+// real, igual o resto do dashboard.
+type linhaEscuta struct {
+	endereco string
+	chave    string
+}
+
+// DefinirEnderecoEscuta monta, uma vez, as linhas que mostram onde o proxy
+// SOCKS5 está acessível, de acordo com o SOCKS_BIND_IP configurado:
+//   - "127.0.0.1": só local.
+//   - "0.0.0.0": local, mais cada IP de rede detectada no host, mais o
+//     wildcard (que não é um endereço conectável, só indica "todas").
+//   - qualquer outra IP: local, mais essa IP específica (é o que
+//     CriaBalanceador também publica nesse caso, então as duas linhas
+//     realmente funcionam).
+//
+// Chamada uma vez na montagem, com o modo e a porta publicados; os
+// endereços de rede não mudam durante a execução.
+func (d *Dashboard) DefinirEnderecoEscuta(bindIP, porta string) {
+	d.linhasEscuta = []linhaEscuta{
+		{net.JoinHostPort("127.0.0.1", porta), "listen_local"},
+	}
+	switch bindIP {
+	case "127.0.0.1":
+		// só a linha local acima.
+	case "0.0.0.0", "":
+		for _, ip := range enderecosLocaisIPv4() {
+			d.linhasEscuta = append(d.linhasEscuta, linhaEscuta{net.JoinHostPort(ip, porta), "listen_lan"})
+		}
+		d.linhasEscuta = append(d.linhasEscuta, linhaEscuta{net.JoinHostPort("0.0.0.0", porta), "listen_all"})
+	default:
+		d.linhasEscuta = append(d.linhasEscuta, linhaEscuta{net.JoinHostPort(bindIP, porta), "listen_lan"})
+	}
+
+	if d.layout != nil {
+		d.layout.ResizeItem(d.resumo, 2+1+len(d.linhasEscuta), 0)
+	}
+}
+
+// textoEnderecosEscuta desenha as linhas de DefinirEnderecoEscuta, uma por
+// endereço, alinhando os rótulos entre parênteses pela coluna mais larga:
+//
+//	· 127.0.0.1:1080    (local)
+//	· 192.168.1.50:1080 (rede interna)
+func (d *Dashboard) textoEnderecosEscuta() string {
+	if len(d.linhasEscuta) == 0 {
+		return ""
+	}
+	largura := 0
+	for _, l := range d.linhasEscuta {
+		if len(l.endereco) > largura {
+			largura = len(l.endereco)
+		}
+	}
+	linhas := make([]string, len(d.linhasEscuta))
+	for i, l := range d.linhasEscuta {
+		linhas[i] = fmt.Sprintf("· %-*s (%s)", largura, l.endereco, T(l.chave))
+	}
+	return strings.Join(linhas, "\n")
 }
 
 // NovoDashboard monta o dashboard e já carrega idioma/tema salvos em
@@ -94,14 +161,14 @@ func NovoDashboard(arquivoPrefs string) *Dashboard {
 		AddItem(d.eventos, 0, 3, false).
 		AddItem(d.atalhos, 0, 1, false)
 
-	layout := tview.NewFlex().SetDirection(tview.FlexRow).
+	d.layout = tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(d.resumo, 3, 0, false).
 		AddItem(d.recursos, 5, 0, false).
 		AddItem(d.tabelasGateways, 0, 2, false).
 		AddItem(d.conexoes, 0, 2, false).
 		AddItem(rodape, 0, 1, false)
 
-	d.pages = tview.NewPages().AddPage("main", layout, true, true)
+	d.pages = tview.NewPages().AddPage("main", d.layout, true, true)
 	d.app.SetRoot(d.pages, true)
 	d.aplicaTema()
 	d.app.SetInputCapture(func(evento *tcell.EventKey) *tcell.EventKey {
@@ -348,7 +415,11 @@ func (d *Dashboard) Atualiza(inicio time.Time, slots []*Slot) {
 			pausa = T("paused_suffix")
 		}
 		linhaResumo := T("summary_line", ativosOk, len(ativos), reservaOk, len(reservas), uptime, pausa)
-		d.resumo.SetText(linhaResumo + d.rotuloTemaIdioma(linhaResumo))
+		texto := linhaResumo + d.rotuloTemaIdioma(linhaResumo)
+		if escuta := d.textoEnderecosEscuta(); escuta != "" {
+			texto += "\n" + escuta
+		}
+		d.resumo.SetText(texto)
 
 		if d.pausado {
 			return

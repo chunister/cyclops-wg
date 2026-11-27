@@ -24,6 +24,7 @@ type Config struct {
 	HealthFails          int
 	ServerCooldown       int // segundos
 	SocksPort            string
+	SocksBindIP          string // "127.0.0.1" (só local), "0.0.0.0" (todas as interfaces), ou uma IP de rede específica do host
 	ApiPort              string
 	ControllerPort       string
 	Dashboard            bool
@@ -88,6 +89,7 @@ func carregaConfig() Config {
 		HealthFails:          envInt("HEALTH_FAILS", 3),
 		ServerCooldown:       envInt("SERVER_COOLDOWN", 600),
 		SocksPort:            env("SOCKS_PORT", "1080"),
+		SocksBindIP:          validaSocksBindIP(env("SOCKS_BIND_IP", "0.0.0.0")),
 		ApiPort:              env("API_PORT", "8081"),
 		ControllerPort:       env("CONTROLLER_PORT", "9090"),
 		Dashboard:            envBool("DASHBOARD", true),
@@ -102,6 +104,23 @@ func carregaConfig() Config {
 		LatencyFile:          resolveRelativo(exeDir, env("LATENCY_FILE", "./latencia.json")),
 		PrefsFile:            resolveRelativo(exeDir, env("PREFS_FILE", "./dashboard-prefs.json")),
 	}
+}
+
+// validaSocksBindIP aceita "0.0.0.0" e "127.0.0.1" direto, e qualquer outro
+// valor só se bater com uma IP de alguma interface de rede real do host;
+// fora isso, avisa no log e cai pro padrão "0.0.0.0" (todas as interfaces),
+// pra não travar o controlador por causa de um IP digitado errado no .env.
+func validaSocksBindIP(v string) string {
+	if v == "0.0.0.0" || v == "127.0.0.1" {
+		return v
+	}
+	for _, ip := range enderecosLocaisIPv4() {
+		if ip == v {
+			return v
+		}
+	}
+	log.Print(T("log_invalid_bind_ip", v))
+	return "0.0.0.0"
 }
 
 func env(chave, padrao string) string {
