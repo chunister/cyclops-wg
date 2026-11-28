@@ -1,5 +1,13 @@
 FROM debian:13-slim
 
+# Só pra build: sem isso, o apt-get tenta abrir um frontend interativo do
+# debconf (Dialog, Readline, Teletype), não acha TTY nenhum dentro do build
+# do Docker, e cospe um aviso de fallback pra cada um até cair sozinho no
+# Noninteractive. É só ruído (o build segue normal mesmo sem isso), mas
+# evita a confusão e, em teoria, evita travar se algum pacote futuro exigir
+# mesmo uma resposta.
+ARG DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends wireguard-tools iproute2 microsocks curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
