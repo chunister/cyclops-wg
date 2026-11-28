@@ -89,10 +89,28 @@ func (d *Dashboard) DefinirEnderecoEscuta(bindIP, porta string) {
 	default:
 		d.linhasEscuta = append(d.linhasEscuta, linhaEscuta{net.JoinHostPort(bindIP, porta), "listen_lan"})
 	}
+}
 
-	if d.layout != nil {
-		d.layout.ResizeItem(d.resumo, 2+1+len(d.linhasEscuta), 0)
-	}
+// mostraEnderecosEscuta abre, sob demanda (atalho "i"), um modal com os
+// endereços de DefinirEnderecoEscuta. Não fica fixo na tela de propósito:
+// uma linha por endereço faria o painel de resumo crescer (mais interfaces
+// de rede detectadas, mais linhas fixas), roubando espaço permanente das
+// tabelas de gateway — effect mais visível com fonte maior no terminal
+// (menos linhas de caractere cabem no total).
+func (d *Dashboard) mostraEnderecosEscuta() {
+	t := d.tema()
+	modal := tview.NewModal().
+		SetText(d.textoEnderecosEscuta()).
+		SetBackgroundColor(t.Fundo).
+		SetTextColor(t.Texto).
+		SetButtonBackgroundColor(t.Apagado).
+		SetButtonTextColor(t.Branco).
+		AddButtons([]string{T("listen_modal_close")}).
+		SetDoneFunc(func(indice int, rotulo string) {
+			d.pages.RemovePage("enderecos")
+		})
+	modal.SetTitle(T("panel_listen"))
+	d.pages.AddPage("enderecos", modal, true, true)
 }
 
 // textoEnderecosEscuta desenha as linhas de DefinirEnderecoEscuta, uma por
@@ -191,6 +209,9 @@ func NovoDashboard(arquivoPrefs string) *Dashboard {
 		case evento.Rune() == 'c':
 			d.eventos.Clear()
 			return nil
+		case evento.Rune() == 'i':
+			d.mostraEnderecosEscuta()
+			return nil
 		case evento.Rune() == 'l':
 			ProximoIdioma()
 			d.aplicaIdioma()
@@ -250,6 +271,7 @@ func (d *Dashboard) redesenhaAtalhos() {
 		linha("r", "shortcut_renew"),
 		linha("p", "shortcut_pause"),
 		linha("c", "shortcut_clear"),
+		linha("i", "shortcut_listen"),
 		linha("l/L", "shortcut_language"),
 		linha("t/T", "shortcut_theme"),
 	}, "\n"))
@@ -416,9 +438,6 @@ func (d *Dashboard) Atualiza(inicio time.Time, slots []*Slot) {
 		}
 		linhaResumo := T("summary_line", ativosOk, len(ativos), reservaOk, len(reservas), uptime, pausa)
 		texto := linhaResumo + d.rotuloTemaIdioma(linhaResumo)
-		if escuta := d.textoEnderecosEscuta(); escuta != "" {
-			texto += "\n" + escuta
-		}
 		d.resumo.SetText(texto)
 
 		if d.pausado {
